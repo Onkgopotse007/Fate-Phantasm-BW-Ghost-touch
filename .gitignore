@@ -476,5 +476,7 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 #custom
-.dll
-.pdp
+*.dll
+*.pdp
+/bin/
+/obj/
