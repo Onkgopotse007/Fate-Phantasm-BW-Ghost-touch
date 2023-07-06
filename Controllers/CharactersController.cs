@@ -29,7 +29,7 @@ namespace RPG_dotnet.Controllers
             characters.Add(newCharacter);
             return Ok(characters);
         }
-        [HttpPut]
+        [HttpPut] some
         public ActionResult<List<Characters>> UpdateCharacter(Characters newCharacter){
             characters.Add(newCharacter);
             return Ok(characters);
