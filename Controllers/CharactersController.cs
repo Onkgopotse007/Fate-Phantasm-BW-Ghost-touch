@@ -4,35 +4,30 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 
-
 namespace RPG_dotnet.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
     public class CharactersController : ControllerBase
     {
-        private static List<Characters> characters = new List<Characters>{
-            new Characters(),
-            new Characters{id=1 ,name="King Arthur", fighterClass= RpgClass.Saber}
-        };
+        public ICharacterService _characterService;
+
+        public CharactersController(ICharacterService characterService)
+        {
+            _characterService = characterService;
+        }
+
         [HttpGet]
-        public ActionResult<List<Characters>> Get(){
-            return Ok(characters);
+        public async Task<ActionResult<ServiceResponse<List<Characters>>>> Get(){
+            return Ok(await _characterService.GetCharacters());
         }
         [HttpGet("{id}")]
-        public ActionResult<Characters> Get(int id){
-
-            return Ok(characters.First(c => c.id == id));
+        public async Task<ActionResult<ServiceResponse<Characters>>> Get(int id){
+            return Ok(await _characterService.GetCharacterById(id));
         }
         [HttpPost]
-        public ActionResult<List<Characters>> CreateCharacter(Characters newCharacter){
-            characters.Add(newCharacter);
-            return Ok(characters);
-        }
-        [HttpPut]
-        public ActionResult<List<Characters>> UpdateCharacter(Characters newCharacter){
-            characters.Add(newCharacter);
-            return Ok(characters);
+        public async Task<ActionResult<ServiceResponse<List<Characters>>>> CreateCharacter(Characters newCharacter){
+            return Ok(await _characterService.AddCharacter(newCharacter));
         }
     }
 }
