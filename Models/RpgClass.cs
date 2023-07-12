@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace RPG_dotnet.Models
 {
-    [JsonConverter(typeof(JsonStringEnumConverter))]
+    [System.Text.Json.Serialization.JsonConverter(typeof(JsonStringEnumConverter))]
     public enum RpgClass
     {
         Archer = 1,
