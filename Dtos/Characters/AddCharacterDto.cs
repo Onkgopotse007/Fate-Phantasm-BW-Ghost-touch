@@ -3,11 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace RPG_dotnet.Models
+namespace RPG_dotnet.Dtos.Characters
 {
-    public class Characters
+    public class AddCharacterDto
     {
-        public int id { get; set; } = 1;
         public string name { get; set; } = "Shirou Emiya";
         public int hitpoints { get; set; } = 10;
         public int strength { get; set; } = 10;
