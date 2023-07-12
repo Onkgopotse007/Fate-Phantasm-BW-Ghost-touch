@@ -23,7 +23,7 @@ builder.Services.AddScoped<ICharacterService, CharacterService>();
 // TODO: implement logic to write error logs to file
 Log.Logger = new LoggerConfiguration()
     .Enrich.FromLogContext()
-    .WriteTo.Console(new ElasticsearchJsonFormatter(), restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Error)
+    .WriteTo.Console(new ElasticsearchJsonFormatter(), restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Warning)
     .CreateLogger();
 builder.Logging.AddSerilog();
 var app = builder.Build();
