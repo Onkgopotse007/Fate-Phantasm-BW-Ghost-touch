@@ -11,6 +11,7 @@ namespace RPG_dotnet.Models
         Rider = 4,
         Caster = 5,
         Assassin = 6,
-        Berserker = 7
+        Berserker = 7,
+        Avenger = 8
     }
 }

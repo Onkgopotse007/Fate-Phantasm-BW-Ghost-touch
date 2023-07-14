@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using RPG_dotnet.Helpers;
+
 
 namespace RPG_dotnet.Middleware
 {
@@ -31,6 +31,7 @@ namespace RPG_dotnet.Middleware
         {
             var statusCode = (int)HttpStatusCode.InternalServerError;
             var message = "An unexpected error occurred";
+            var data = new List<object>();
             Log.Error(ex, "An exception occurred", ex.Message);
             if (ex is NullReferenceException)
             {
@@ -39,24 +40,38 @@ namespace RPG_dotnet.Middleware
                 message = notFoundException.Message;
             }
             else if (ex is SqlException sqlException)
-    {
-        if (sqlException.Number == 2627 || sqlException.Number == 2601)
-        {
-            var conflictException = new ConflictException(sqlException.Message);
-            statusCode = conflictException.StatusCode;
-            message = conflictException.Message;
-        }
-        else
-        {
-            var databaseException = new DatabaseException();
-            statusCode = databaseException.StatusCode;
-            message = databaseException.Message;
-        }
-    }
+            {
+                if (sqlException.Number == 2627 || sqlException.Number == 2601)
+                {
+                    var conflictException = new ConflictException(sqlException.Message);
+                    statusCode = conflictException.StatusCode;
+                    message = conflictException.Message;
+                }
+                else
+                {
+                    var databaseException = new DatabaseException();
+                    statusCode = databaseException.StatusCode;
+                    message = databaseException.Message;
+                }
+            }
             else if (ex is BaseException baseException)
             {
                 statusCode = baseException.StatusCode;
                 message = ex.Message;
+            }
+            else if (ex is FluentValidation.ValidationException validationException)
+            {
+                statusCode = (int)HttpStatusCode.BadRequest;
+                message = validationException.Message;
+                data = validationException.Errors.Select(e => new
+                {
+                    PropertyName = e.PropertyName,
+                    ErrorMessage = e.ErrorMessage
+                }).ToList<object>();
+            }else{
+                GenericException genericException = new GenericException();
+                statusCode = genericException.StatusCode;
+                message = genericException.Message;
             }
 
             context.Response.StatusCode = statusCode;
@@ -66,7 +81,7 @@ namespace RPG_dotnet.Middleware
                 success = false,
                 message = message,
                 exception = ex.GetType().Name,
-                data = new string[] { }
+                data = data
             };
 
             var jsonExceptionResponse = JsonConvert.SerializeObject(errorResponse);
