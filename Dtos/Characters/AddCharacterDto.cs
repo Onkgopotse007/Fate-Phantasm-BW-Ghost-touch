@@ -7,11 +7,11 @@ namespace RPG_dotnet.Dtos.Characters
 {
     public class AddCharacterDto
     {
-        public string name { get; set; } = "Shirou Emiya";
-        public int hitpoints { get; set; } = 10;
-        public int strength { get; set; } = 10;
-        public int defense { get; set; } = 10;
-        public int intelligence { get; set; } = 10;
-        public RpgClass fighterClass {get; set;} = RpgClass.Archer;
+        public required string name { get; set; }
+        public int hitpoints { get; set; } 
+        public int strength { get; set; }
+        public int defense { get; set; }
+        public int intelligence { get; set; }
+        public RpgClass fighterClass {get; set;}
     }
 }
