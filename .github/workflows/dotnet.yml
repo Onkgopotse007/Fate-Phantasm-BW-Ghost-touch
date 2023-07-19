@@ -38,5 +38,5 @@ jobs:
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      run: aws --debug --region af-south-1 s3 sync ./ s3://fatephantasmbucket/
+      run: aws --debug --region af-south-1 s3 sync ./ s3://fatephantasmbucket/fatephantasm --exclude ".github/*" --exclude ".git/*" --exclude ".gitignore"
 
