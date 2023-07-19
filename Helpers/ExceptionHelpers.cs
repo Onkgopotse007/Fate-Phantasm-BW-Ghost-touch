@@ -44,4 +44,11 @@ public class DatabaseException : BaseException
     {
     }
 }
+public class AuthException: BaseException
+{
+    public AuthException(string message = "Not Authorized", List<object>? data = null, int statusCode =(int)HttpStatusCode.Unauthorized ) : base(message, (int)HttpStatusCode.Unauthorized, data)
+    {
+        
+    }
+}
 }

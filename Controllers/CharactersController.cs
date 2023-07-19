@@ -9,8 +9,9 @@ using RPG_dotnet.Helpers;
 
 namespace RPG_dotnet.Controllers
 {
+    [Authorize]
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("phantasm/[controller]")]
     public class CharactersController : ControllerBase
     {
         public ICharacterService _characterService;
@@ -23,7 +24,8 @@ namespace RPG_dotnet.Controllers
         [HttpGet]
         public async Task<ActionResult<ServiceResponse<List<GetCharacterDto>>>> Get()
         {
-            return Ok(await _characterService.GetCharacters());
+            int userId = int.Parse(User.Claims.FirstOrDefault(c=>c.Type== ClaimTypes.NameIdentifier)!.Value);
+            return Ok(await _characterService.GetCharacters(userId));
         }
         [HttpGet("{id}")]
         public async Task<ActionResult<ServiceResponse<GetCharacterDto>>> Get(int id)
@@ -33,6 +35,7 @@ namespace RPG_dotnet.Controllers
                 return NotFound(response);
             return Ok(await _characterService.GetCharacterById(id));
         }
+        [Authorize(Roles ="1")]
         [HttpPost]
         public async Task<ActionResult<ServiceResponse<List<GetCharacterDto>>>> CreateCharacter(AddCharacterDto newCharacter,
         [FromServices] IValidator<AddCharacterDto> validator)
@@ -50,6 +53,7 @@ namespace RPG_dotnet.Controllers
             await functions.validateDtoAsync(updatedCharacter, validator);
             return Ok(await _characterService.UpdateCharacter(updatedCharacter));
         }
+        [Authorize(Roles ="1")]
         [HttpDelete("{id}")]
         public async Task<ActionResult<ServiceResponse<List<GetCharacterDto>>>> DeleteCharacter(int id)
         {
