@@ -33,7 +33,15 @@ jobs:
       run: dotnet test --no-build --verbosity normal
     - name: Configure AWS CLI
       run: aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }} && aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    - name: Build Docker image
+      run: |
+        docker build -t phantasm-image .
+    - name: Create Docker directory
+      run: mkdir -p Docker
 
+    - name: Save Docker image to directory
+      run: |
+        docker save phantasm-image:latest > Docker/phantasm-image .tar
     - name: Upload to S3
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
