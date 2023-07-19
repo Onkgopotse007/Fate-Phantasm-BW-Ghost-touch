@@ -24,6 +24,9 @@ namespace RPG_dotnet.Services.CharactersService
         {
             var serviceResponse = new ServiceResponse<List<GetCharacterDto>>();
             var character  = _mapper.Map<Characters>(newCharacter);
+            if(await CharacterExists(newCharacter.name)){
+                throw new ConflictException($"Character {newCharacter.name} already exists");
+            }
             _context.Characters.Add(_mapper.Map<Characters>(newCharacter));
             await _context.SaveChangesAsync();
             serviceResponse.data = await _context.Characters.Select(c=> _mapper.Map<GetCharacterDto>(c)).ToListAsync();
@@ -50,7 +53,7 @@ namespace RPG_dotnet.Services.CharactersService
             return  serviceResponse;
         }
 
-        public async Task<ServiceResponse<List<GetCharacterDto>>> GetCharacters()
+        public async Task<ServiceResponse<List<GetCharacterDto>>> GetCharacters(int userId)
         {
             var serviceResponse = new ServiceResponse<List<GetCharacterDto>>();
             var characters = await _context.Characters.ToListAsync();
@@ -71,6 +74,14 @@ namespace RPG_dotnet.Services.CharactersService
             await _context.SaveChangesAsync();
             serviceResponse.data = _mapper.Map<GetCharacterDto>(character);
             return  serviceResponse;
+        }
+        public async Task<bool> CharacterExists(string name)
+        {
+            if (await _context.Characters.AnyAsync(c => c.name.ToLower() == name.ToLower()))
+            {
+                return true;
+            }
+            return false;
         }
 
     
