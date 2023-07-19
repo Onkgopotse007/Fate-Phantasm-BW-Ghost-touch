@@ -13,7 +13,7 @@ COPY . .
 RUN dotnet build
 
 # Publish the application
-RUN dotnet publish --no-restore -c Release -o /app
+RUN dotnet publish -c Release -o /app
 
 # Use a .NET Core runtime image for the final stage
 FROM mcr.microsoft.com/dotnet/runtime:7.0
