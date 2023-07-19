@@ -26,7 +26,6 @@ global using System.IdentityModel.Tokens.Jwt;
 global using Microsoft.AspNetCore.Authentication.JwtBearer;
 global using Microsoft.AspNetCore.Authorization;
 global using Swashbuckle.AspNetCore.Filters;
-global using RPG_dotnet.Dtos.Team;
 global using RPG_dotnet.Services.TeamService;
 global using Microsoft.AspNetCore.Mvc.Filters;
 global using RPG_dotnet.Controllers;
