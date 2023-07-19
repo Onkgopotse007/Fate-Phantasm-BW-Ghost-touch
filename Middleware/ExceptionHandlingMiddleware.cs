@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Authentication;
 using System.Threading.Tasks;
 
 
@@ -32,7 +33,6 @@ namespace RPG_dotnet.Middleware
             var statusCode = (int)HttpStatusCode.InternalServerError;
             var message = "An unexpected error occurred";
             var data = new List<object>();
-            Log.Error(ex, "An exception occurred", ex.Message);
             if (ex is NullReferenceException)
             {
                 var notFoundException = new NotFoundException();
@@ -54,6 +54,7 @@ namespace RPG_dotnet.Middleware
                     message = databaseException.Message;
                 }
             }
+
             else if (ex is BaseException baseException)
             {
                 statusCode = baseException.StatusCode;
@@ -68,11 +69,33 @@ namespace RPG_dotnet.Middleware
                     PropertyName = e.PropertyName,
                     ErrorMessage = e.ErrorMessage
                 }).ToList<object>();
-            }else{
+            }
+            else if (ex is DbUpdateException updateException)
+            {
+                if (ex.InnerException is Microsoft.Data.SqlClient.SqlException sqlEx && (sqlEx.Number == 2627 || sqlEx.Number == 2601))
+                {
+                    var conflictException = new ConflictException("One of the inputs is violating a unique key constraint");
+                    statusCode = conflictException.StatusCode;
+                    message = conflictException.Message;
+                }
+                else
+                {
+                    var databaseException = new DatabaseException();
+                    statusCode = databaseException.StatusCode;
+                    message = databaseException.Message;
+                }
+            }
+            else if(ex is AuthException authException){
+                statusCode = authException.StatusCode;
+                message = authException.Message;
+            }
+            else
+            {
                 GenericException genericException = new GenericException();
                 statusCode = genericException.StatusCode;
                 message = genericException.Message;
             }
+            
 
             context.Response.StatusCode = statusCode;
 
@@ -83,6 +106,7 @@ namespace RPG_dotnet.Middleware
                 exception = ex.GetType().Name,
                 data = data
             };
+            Log.Error(ex, $"An exception occurred {ex.Message}", data);
 
             var jsonExceptionResponse = JsonConvert.SerializeObject(errorResponse);
 
