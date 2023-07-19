@@ -31,6 +31,16 @@ jobs:
       run: dotnet build --no-restore
     - name: Test
       run: dotnet test --no-build --verbosity normal
+    - name: Build Docker image
+      run: |
+        docker build -t phantasm-image .
+
+    - name: Create Docker directory
+      run: mkdir -p Docker
+
+    - name: Save Docker image to directory
+      run: |
+        docker save phantasm-image:latest > Docker/phantasm-image .tar
     - name: Configure AWS CLI
       run: aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }} && aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
