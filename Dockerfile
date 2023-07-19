@@ -3,7 +3,7 @@ FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
 WORKDIR /source
 
 COPY *.csproj .
-RUN dotnet restore
+RUN dotnet restore --use-current-runtime
 
 
 COPY . .
