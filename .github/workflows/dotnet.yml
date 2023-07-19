@@ -41,7 +41,7 @@ jobs:
 
     - name: Save Docker image to directory
       run: |
-        docker save phantasm-image:latest > Docker/phantasm-image .tar
+        docker save phantasm-image:latest > Docker/phantasm-image
     - name: Upload to S3
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
