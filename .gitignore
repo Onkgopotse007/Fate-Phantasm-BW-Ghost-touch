@@ -478,5 +478,6 @@ $RECYCLE.BIN/
 #custom
 *.dll
 *.pdp
+*.env
 /bin/
 /obj/

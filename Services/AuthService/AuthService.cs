@@ -66,7 +66,7 @@ namespace RPG_dotnet.Data
                 new Claim(ClaimTypes.Name, user.userName),
                 new Claim(ClaimTypes.Role, user.userRole.ToString())
             };
-            var appSettingsToken = "top secret key placeholder";
+            var appSettingsToken = Environment.GetEnvironmentVariable("TOKEN").ToString();
             if(appSettingsToken is null)
                 throw new BaseException("Token issue");
 

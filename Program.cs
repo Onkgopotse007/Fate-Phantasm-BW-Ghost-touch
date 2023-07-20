@@ -30,12 +30,17 @@ global using RPG_dotnet.Services.TeamService;
 global using Microsoft.AspNetCore.Mvc.Filters;
 global using RPG_dotnet.Controllers;
 using Microsoft.OpenApi.Models;
+using dotenv.net;
 
 var builder = WebApplication.CreateBuilder(args);
-
+DotEnv.AutoConfig();
+string connString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING");
+string token = Environment.GetEnvironmentVariable("TOKEN");
+if(connString is null || token is null)
+    throw new NotFoundException("Missing environment variables");
 // Add services to the container.
 builder.Services.AddDbContext<DataContext>(options =>
-options.UseSqlServer(builder.Configuration.GetConnectionString("developmentConnection")));
+options.UseSqlServer(connString));
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -62,7 +67,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             {
                 ValidateIssuerSigningKey = true,
                 IssuerSigningKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8
-                    .GetBytes("top secret key placeholder")),
+                    .GetBytes(token)),
                 ValidateIssuer = false,
                 ValidateAudience = false
             };
