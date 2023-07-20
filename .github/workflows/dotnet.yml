@@ -9,7 +9,7 @@ on:
   pull_request:
     branches: [ "development" ]
   schedule:
-  - cron: "0 14 * * 1-6"
+    - cron: "0 14 * * 1-6"
 
 jobs:
   build:
@@ -20,31 +20,41 @@ jobs:
         dotnet-version: ['6.0.x', '7.0.x']
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Ghost_RPG
-      uses: actions/setup-dotnet@v3
-      with:
-        dotnet-version: ${{matrix.dotnet-version}}
-    - name: Restore dependencies
-      run: dotnet restore
-    - name: Build
-      run: dotnet build --no-restore
-    - name: Test
-      run: dotnet test --no-build --verbosity normal
-    - name: Configure AWS CLI
-      run: aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }} && aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-    - name: Build Docker image
-      run: |
-        docker build -t phantasm-image .
-    - name: Create Docker directory
-      run: mkdir -p Docker
-
-    - name: Save Docker image to directory
-      run: |
-        docker save phantasm-image:latest > Docker/phantasm-image
-    - name: Upload to S3
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      run: aws --debug --region af-south-1 s3 sync ./ s3://fatephantasmbucket/fatephantasm --exclude ".github/*" --exclude ".git/*" --exclude ".gitignore"
-
+      - uses: actions/checkout@v3
+      - name: Ghost_RPG
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: ${{matrix.dotnet-version}}
+      - name: Restore dependencies
+        run: dotnet restore
+      - name: Build
+        run: dotnet build --no-restore
+      - name: Test
+        run: dotnet test --no-build --verbosity normal
+      - name: Configure AWS CLI
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set default.region af-south-1
+      - name: Build Docker image
+        run: |
+          docker build -t phantasm-image .
+      - name: Log in to Amazon ECR
+        run: |
+          aws ecr get-login-password --region af-south-1 | docker login --username AWS --password-stdin 985550584642.dkr.ecr.af-south-1.amazonaws.com
+      - name: Tag the Docker image
+        run: |
+          docker tag phantasm-image:latest 985550584642.dkr.ecr.af-south-1.amazonaws.com/fatephantasm:latest
+      - name: Push the Docker image to Amazon ECR
+        run: |
+          docker push 985550584642.dkr.ecr.af-south-1.amazonaws.com/fatephantasm:latest
+      - name: Create Docker directory
+        run: mkdir -p Docker
+      - name: Save Docker image to directory
+        run: |
+          docker save phantasm-image:latest > Docker/phantasm-image
+      - name: Upload to S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: aws --debug --region af-south-1 s3 sync ./ s3://fatephantasmbucket/fatephantasm --exclude ".github/*" --exclude ".git/*" --exclude ".gitignore"
