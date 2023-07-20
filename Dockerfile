@@ -19,4 +19,5 @@ RUN dotnet publish -c Release -o /app
 FROM mcr.microsoft.com/dotnet/runtime:7.0
 WORKDIR /app
 COPY --from=build /app .
+EXPOSE 80
 ENTRYPOINT ["dotnet", "fatephantasm.dll"]
