@@ -46,8 +46,8 @@ jobs:
       #- name: Push the Docker image to Amazon ECR
        # run: |
          # docker push 985550584642.dkr.ecr.af-south-1.amazonaws.com/fatephantasm:latest
-     # - name: Create Docker directory
-       # run: mkdir -p Docker
+      - name: Create Docker directory
+        run: mkdir -p Docker
       - name: Save Docker image to directory
         run: |
           docker save phantasm-image:latest > Docker/phantasm-image
