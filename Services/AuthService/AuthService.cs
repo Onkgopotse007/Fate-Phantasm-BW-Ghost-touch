@@ -13,31 +13,33 @@ namespace RPG_dotnet.Data
         {
             _configuration = configuration;
             _context = context;
-            
+
         }
-        public async Task<ServiceResponse<string>> Login(string userName, string password)
+        public async Task<ServiceResponse<UserLoginResponse>> Login(string userName, string password)
         {
             Functions functions = new Functions();
-            
-            var response = new ServiceResponse<string>();
+
+            var response = new ServiceResponse<UserLoginResponse>();
             var user = await _context.Users
-                .FirstOrDefaultAsync(u=> u.userName.Equals(userName));
-            if(user is null || !functions.VerifyPasswordHash(password, user.passwordHash,user.passwordSalt))
+                .FirstOrDefaultAsync(u => u.userName.Equals(userName));
+            if (user is null || !functions.VerifyPasswordHash(password, user.passwordHash, user.passwordSalt))
             {
                 throw new NotFoundException("User details incorrect");
             }
-            else{
-                response.data= CreateToken(user);
+            else
+            {
+                response.data = new UserLoginResponse { token = CreateToken(user) };
                 return response;
             }
-        
+
         }
 
-        public async Task<ServiceResponse<int>> Register(User user, string password)
+        public async Task<ServiceResponse<UserRegistrationResponse>> Register(User user, string password)
         {
-            var response = new ServiceResponse<int>();
+            var response = new ServiceResponse<UserRegistrationResponse>();
             Functions functions = new Functions();
-            if(await UserExists(user.userName)){
+            if (await UserExists(user.userName))
+            {
                 throw new ConflictException("User already exists");
             }
             functions.CreatePasswordHash(password, out byte[] passwordHash, out byte[] passwordSalt);
@@ -46,8 +48,8 @@ namespace RPG_dotnet.Data
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
-            response.data = user.id;
-            response.message ="New user created";
+            response.data = new UserRegistrationResponse { user_id = user.id };
+            response.message = "New user created";
             return response;
         }
 
@@ -67,7 +69,7 @@ namespace RPG_dotnet.Data
                 new Claim(ClaimTypes.Role, user.userRole.ToString())
             };
             var appSettingsToken = Environment.GetEnvironmentVariable("TOKEN").ToString();
-            if(appSettingsToken is null)
+            if (appSettingsToken is null)
                 throw new BaseException("Token issue");
 
             SymmetricSecurityKey key = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(appSettingsToken));
