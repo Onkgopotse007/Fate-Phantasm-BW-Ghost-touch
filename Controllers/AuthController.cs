@@ -18,7 +18,7 @@ namespace RPG_dotnet.Controllers
         }
         [AllowUnauthenticated]
         [HttpPost("Register")]
-        public async Task<ActionResult<ServiceResponse<int>>> Register(UserRegisterDto request,
+        public async Task<ActionResult<ServiceResponse<UserRegistrationResponse>>> Register(UserRegisterDto request,
         [FromServices] IValidator<UserRegisterDto> validator)
         {
             Functions functions = new Functions();
@@ -30,7 +30,7 @@ namespace RPG_dotnet.Controllers
         }
         [AllowUnauthenticated]
         [HttpPost("Login")]
-        public async Task<ActionResult<ServiceResponse<int>>> Login(UserLoginDto request,
+        public async Task<ActionResult<ServiceResponse<UserLoginResponse>>> Login(UserLoginDto request,
         [FromServices] IValidator<UserLoginDto> validator)
         {
             Functions functions = new Functions();
