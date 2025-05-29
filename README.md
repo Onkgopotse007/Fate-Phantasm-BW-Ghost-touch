@@ -11,6 +11,8 @@ Happy new year, finally managed to get more free time as I was juggling work and
 
 My first order of business now is to overhaul the role based access logic so I utilize a middleware based solution instead, after I have achieved that I will continue on to the functionality of the API. Otherwise happy coding and have a productive 2024. -BW Ghost-
 
+I kind of ended up abandoning this for way too long, so long that I'm still readjusting to what I wanted to do and I even have a good idea of how to play make this playable purely through json, I know people will want to actually play with a UI but let's get to that later - BW GHOST- May 2025
+
 Features
 - Global exception handling middleware
 - Validation of inputs using fluent validations
