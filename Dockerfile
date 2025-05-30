@@ -1,23 +1,20 @@
-# Use an appropriate .NET Core SDK image as the build stage
+# ---- Build Stage ----
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-WORKDIR /source
-
-# Copy the project file and restore dependencies
-COPY *.csproj .
-RUN dotnet restore --use-current-runtime
-
-# Copy the entire application source code
-COPY . .
-
-# Build the application
-RUN dotnet build
-
-# Publish the application
-RUN dotnet publish -c Release -o /app
-
-# Use a .NET Core runtime image for the final stage
-FROM mcr.microsoft.com/dotnet/runtime:8.0
 WORKDIR /app
-COPY --from=build /app .
+
+# Copy everything (including .csproj and solution)
+COPY . ./
+
+# Restore packages
+RUN dotnet restore
+
+# Build and publish
+RUN dotnet publish -c Release -o /app/out
+
+# ---- Runtime Stage ----
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
+WORKDIR /app
+COPY --from=build /app/out .
+
 EXPOSE 80
 ENTRYPOINT ["dotnet", "fatephantasm.dll"]
