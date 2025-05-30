@@ -1,0 +1,17 @@
+# render.yaml
+services:
+  - type: web
+    name: Fate-Phantasm
+    env: docker
+    region: oregon
+    plan: free
+    branch: development
+    buildCommand: ""  # Render will use Dockerfile
+    startCommand: ""  # Docker CMD will be used
+    dockerContext: .
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: DB_CONNECTION_STRING
+        sync: false #i.e will get env variable from render
+      - key: TOKEN
+        sync: false
