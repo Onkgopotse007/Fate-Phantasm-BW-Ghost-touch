@@ -17,4 +17,4 @@ WORKDIR /app
 COPY --from=build /app/out .
 
 EXPOSE 80
-ENTRYPOINT ["dotnet", "fatephantasm.dll"]
+ENTRYPOINT ["dotnet", "RPG-dotnet.dll"]
