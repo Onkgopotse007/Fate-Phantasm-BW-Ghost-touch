@@ -9,7 +9,9 @@ namespace RPG_dotnet
     {
         public AutoMapperProfile()
         {
-            CreateMap<Characters, GetCharacterDto>();
+            CreateMap<Characters, GetCharacterDto>()
+                .ForMember(dest => dest.abilities, opt =>
+                    opt.MapFrom(src => src.characterAbilities.Select(ca => ca.ability)));
             CreateMap<AddCharacterDto, Characters>();
             CreateMap<UpdateCharacterDto, Characters>();
             CreateMap<UserCharacter, GetCharacterDto>()
@@ -20,6 +22,7 @@ namespace RPG_dotnet
                 .ForMember(dest => dest.defense, opt => opt.MapFrom(src => src.character.defense))
                 .ForMember(dest => dest.intelligence, opt => opt.MapFrom(src => src.character.intelligence))
                 .ForMember(dest => dest.fighterClass, opt => opt.MapFrom(src => src.character.fighterClass));
+            CreateMap<Ability, GetAbilityDto>();
         }
     }
 }
