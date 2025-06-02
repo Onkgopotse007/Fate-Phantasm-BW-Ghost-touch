@@ -28,7 +28,7 @@ jobs:
       - name: Build
         run: dotnet build --no-restore
       - name: Test
-        run: dotnet test --no-build --verbosity normal
+        run: dotnet test --verbosity normal
      # - name: Configure AWS CLI
       #  run: |
        #   aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
