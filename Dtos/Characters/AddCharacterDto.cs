@@ -17,8 +17,8 @@ namespace RPG_dotnet.Dtos.Characters
         public int baseDamage { get; set; }
         public int manaGainPerAttack { get; set; }
         public RpgClass fighterClass { get; set; }
-        public Role role { get; set; }
+        public RoleType role { get; set; }
 
-        public List<int> abilityIds { get; set; } = new List<int>();
+        public List<AddAbilityDto> abilities { get; set; } // instead of abilityIds
     }
 }

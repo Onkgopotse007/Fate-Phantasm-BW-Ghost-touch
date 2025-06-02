@@ -16,6 +16,7 @@ namespace RPG_dotnet.Dtos.Characters
         public int movement { get; set; }
         public int baseDamage { get; set; }
         public int manaGainPerAttack { get; set; }
-        public List<int> abilityIds { get; set; } = new();
+        public List<AddAbilityDto> abilities { get; set; } // instead of abilityIds
+
     }
 }

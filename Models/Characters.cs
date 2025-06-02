@@ -19,8 +19,6 @@ namespace RPG_dotnet.Models
         public int manaGainPerAttack { get; set; } = 10;
         public RpgClass fighterClass { get; set; } = RpgClass.Archer;
         public RoleType role { get; set; } = RoleType.Vanguard;
-
-        public ICollection<CharacterAbility> characterAbilities { get; set; }
-        public ICollection<UserCharacter> userCharacters { get; set; }
+        public List<Ability> abilities { get; set; } = new();
     }
 }

@@ -8,6 +8,8 @@ namespace RPG_dotnet.Models
         public string name { get; set; } = string.Empty;
         public string description { get; set; } = string.Empty;
         public int manaCost { get; set; } = 0;
-        public ICollection<CharacterAbility> characterAbilities { get; set; }
+        public int damage { get; set; } = 0;
+        public int characterId { get; set; }
+        public Characters character { get; set; }
     }
 }

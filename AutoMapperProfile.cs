@@ -9,9 +9,7 @@ namespace RPG_dotnet
     {
         public AutoMapperProfile()
         {
-            CreateMap<Characters, GetCharacterDto>()
-                .ForMember(dest => dest.abilities, opt =>
-                    opt.MapFrom(src => src.characterAbilities.Select(ca => ca.ability)));
+            CreateMap<Characters, GetCharacterDto>();
             CreateMap<AddCharacterDto, Characters>();
             CreateMap<UpdateCharacterDto, Characters>();
             CreateMap<UserCharacter, GetCharacterDto>()

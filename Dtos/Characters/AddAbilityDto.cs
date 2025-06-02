@@ -5,14 +5,11 @@ using System.Threading.Tasks;
 
 namespace RPG_dotnet.Dtos.Characters
 {
-    public class GetAbilityDto
+    public class AddAbilityDto
     {
-        public int id { get; set; }
-        public string name { get; set; }
-        public string effect { get; set; }
+        public string name { get; set; } = string.Empty;
+        public string description { get; set; } = string.Empty;
         public int manaCost { get; set; }
-
         public int damage { get; set; }
     }
-
 }
