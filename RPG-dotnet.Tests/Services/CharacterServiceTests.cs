@@ -5,7 +5,9 @@ using RPG_dotnet.Models;
 using RPG_dotnet.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Threading.Tasks;
+using RPG_dotnet.Dtos.Characters;
 using RPG_dotnet;
+using AutoMapper;
 
 public class CharacterServiceTests
 {

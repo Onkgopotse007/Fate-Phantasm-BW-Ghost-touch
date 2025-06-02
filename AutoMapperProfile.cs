@@ -21,6 +21,7 @@ namespace RPG_dotnet
                 .ForMember(dest => dest.intelligence, opt => opt.MapFrom(src => src.character.intelligence))
                 .ForMember(dest => dest.fighterClass, opt => opt.MapFrom(src => src.character.fighterClass));
             CreateMap<Ability, GetAbilityDto>();
+            CreateMap<AddAbilityDto, Ability>();
         }
     }
 }
