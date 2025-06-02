@@ -5,7 +5,7 @@ global using AutoMapper;
 global using RPG_dotnet.Middleware;
 global using System.Net;
 global using Newtonsoft.Json;
-global using System.Data.SqlClient;
+global using Microsoft.Data.SqlClient;
 global using Serilog;
 global using Serilog.Formatting.Elasticsearch;
 global using Microsoft.EntityFrameworkCore;
@@ -33,7 +33,7 @@ using Microsoft.OpenApi.Models;
 using dotenv.net;
 
 var builder = WebApplication.CreateBuilder(args);
-DotEnv.AutoConfig();
+DotEnv.Load();
 string connString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING");
 string token = Environment.GetEnvironmentVariable("TOKEN");
 if(connString is null || token is null)

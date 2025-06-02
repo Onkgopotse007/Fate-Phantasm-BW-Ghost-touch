@@ -23,26 +23,44 @@ namespace RPG_dotnet.Services.CharactersService
         public async Task<ServiceResponse<List<GetCharacterDto>>> AddCharacter(AddCharacterDto newCharacter)
         {
             var serviceResponse = new ServiceResponse<List<GetCharacterDto>>();
-            var character  = _mapper.Map<Characters>(newCharacter);
-            if(await CharacterExists(newCharacter.name)){
+
+            if (await CharacterExists(newCharacter.name))
+            {
                 throw new ConflictException($"Character {newCharacter.name} already exists");
             }
-            _context.Characters.Add(_mapper.Map<Characters>(newCharacter));
-            await _context.SaveChangesAsync();
-            serviceResponse.data = await _context.Characters.Select(c=> _mapper.Map<GetCharacterDto>(c)).ToListAsync();
-            return  serviceResponse;
-        }
 
+            var character = _mapper.Map<Characters>(newCharacter);
+
+            // Assign abilities directly
+            character.abilities = newCharacter.abilities
+                .Select(a => new Ability
+                {
+                    name = a.name,
+                    description = a.description,
+                    manaCost = a.manaCost,
+                    damage = a.damage
+                }).ToList();
+
+            _context.Characters.Add(character);
+            await _context.SaveChangesAsync();
+
+            serviceResponse.data = await _context.Characters
+                .Include(c => c.abilities)
+                .Select(c => _mapper.Map<GetCharacterDto>(c))
+                .ToListAsync();
+
+            return serviceResponse;
+        }
         public async Task<ServiceResponse<List<GetCharacterDto>>> DeleteCharacters(int id)
         {
             var serviceResponse = new ServiceResponse<List<GetCharacterDto>>();
-            var character = _context.Characters.FirstOrDefault(c=> c.id == id);
-            if(character is null)
+            var character = _context.Characters.FirstOrDefault(c => c.id == id);
+            if (character is null)
                 throw new NotFoundException($"Character with id '{id}' not found.");
             _context.Characters.Remove(character);
             await _context.SaveChangesAsync();
-            serviceResponse.data = await _context.Characters.Select(c=> _mapper.Map<GetCharacterDto>(c)).ToListAsync();
-            return  serviceResponse;
+            serviceResponse.data = await _context.Characters.Select(c => _mapper.Map<GetCharacterDto>(c)).ToListAsync();
+            return serviceResponse;
         }
 
         public async Task<ServiceResponse<GetCharacterDto>> GetCharacterById(int id)
@@ -50,30 +68,56 @@ namespace RPG_dotnet.Services.CharactersService
             var serviceResponse = new ServiceResponse<GetCharacterDto>();
             var character = await _context.Characters.FirstOrDefaultAsync(c => c.id == id);
             serviceResponse.data = _mapper.Map<GetCharacterDto>(character);
-            return  serviceResponse;
+            return serviceResponse;
         }
 
         public async Task<ServiceResponse<List<GetCharacterDto>>> GetCharacters(int userId)
         {
             var serviceResponse = new ServiceResponse<List<GetCharacterDto>>();
             var characters = await _context.Characters.ToListAsync();
-            serviceResponse.data = characters.Select(c=> _mapper.Map<GetCharacterDto>(c)).ToList();
-            return  serviceResponse;
+            serviceResponse.data = characters.Select(c => _mapper.Map<GetCharacterDto>(c)).ToList();
+            return serviceResponse;
         }
 
         public async Task<ServiceResponse<GetCharacterDto>> UpdateCharacter(UpdateCharacterDto updateCharacter)
         {
             var serviceResponse = new ServiceResponse<GetCharacterDto>();
-            var character = await _context.Characters.FirstOrDefaultAsync(c=> c.id == updateCharacter.id);
-            if(character is null)
+
+            var character = await _context.Characters
+                .Include(c => c.abilities)
+                .FirstOrDefaultAsync(c => c.id == updateCharacter.id);
+
+            if (character is null)
+            {
                 throw new NotFoundException($"Character with id '{updateCharacter.id}' not found.");
-            character.defense = updateCharacter.defense;
+            }
+
             character.hitpoints = updateCharacter.hitpoints;
-            character.intelligence = updateCharacter.intelligence;
+            character.mana = updateCharacter.mana;
+            character.movement = updateCharacter.movement;
             character.strength = updateCharacter.strength;
+            character.defense = updateCharacter.defense;
+            character.intelligence = updateCharacter.intelligence;
+
+            // Replace abilities
+            if (updateCharacter.abilities is { Count: > 0 })
+            {
+                _context.Abilities.RemoveRange(character.abilities);
+
+                character.abilities = updateCharacter.abilities
+                    .Select(a => new Ability
+                    {
+                        name = a.name,
+                        description = a.description,
+                        manaCost = a.manaCost,
+                        damage = a.damage
+                    }).ToList();
+            }
+
             await _context.SaveChangesAsync();
+
             serviceResponse.data = _mapper.Map<GetCharacterDto>(character);
-            return  serviceResponse;
+            return serviceResponse;
         }
         public async Task<bool> CharacterExists(string name)
         {
@@ -84,6 +128,6 @@ namespace RPG_dotnet.Services.CharactersService
             return false;
         }
 
-    
+
     }
 }

@@ -14,4 +14,10 @@ namespace RPG_dotnet.Models
         Berserker = 7,
         Avenger = 8
     }
+
+    public enum RoleType
+    {
+        Vanguard,
+        Support
+    }
 }
