@@ -1,4 +1,4 @@
-# dotnet-7-rpg
+# dotnet-7-rpg(replace 7 with 8 because I upgraded to 8 for LTS, back then I didn't fully grasp the importance of using LTS versions)
 This is a sample project I did to showcase my knowledge of .NET 7 feel free to reuse the code or even better give me pointers on improving my code.
 My aim is to make an RPG based on the fate anime series, fate/zero and fate/stay night, I have settled on having 14 characters and have been able to balance their stats, been able to prevent players from choosing more than 1 character from the same class and have included one of the unique heroic spirits "Avenger" Angra Mainyu, I do think I might've maybe made it overkill by allowing a player to have 7 characters, all that's left for me is to balance their noble phantasms, then I will get into the game part of this project.
 
@@ -12,6 +12,8 @@ Happy new year, finally managed to get more free time as I was juggling work and
 My first order of business now is to overhaul the role based access logic so I utilize a middleware based solution instead, after I have achieved that I will continue on to the functionality of the API. Otherwise happy coding and have a productive 2024. -BW Ghost-
 
 I kind of ended up abandoning this for way too long, so long that I'm still readjusting to what I wanted to do and I even have a good idea of how to play make this playable purely through json, I know people will want to actually play with a UI but let's get to that later - BW GHOST- May 2025
+
+There has been a lot of changes, but now the game will be somewhat playable, it's gonna be turn based game and will be fully playable on the API, when it's complete I will make a video about it and do a deep dive
 
 Features
 - Global exception handling middleware
@@ -28,4 +30,4 @@ To build:
 To run
 - dotnet watch run
 
-I'm reachable on +267 75295351
+I'm reachable on +267 75295351 and tonyonkgopotserichard@gmail.com
