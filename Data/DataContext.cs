@@ -9,14 +9,19 @@ namespace RPG_dotnet.Data
 {
     public class DataContext : DbContext
     {
-        public DataContext(DbContextOptions<DataContext> options) : base(options)
+        private readonly bool _seedAbilities;
+
+        public DataContext(DbContextOptions<DataContext> options, bool seedAbilities = false)
+            : base(options)
         {
+            _seedAbilities = seedAbilities;
         }
 
         public DbSet<Characters> Characters => Set<Characters>();
         public DbSet<User> Users => Set<User>();
-        public DbSet<UserCharacter> UserCharacters => Set<UserCharacter>();
         public DbSet<Ability> Abilities => Set<Ability>();
+        public DbSet<Loadout> Loadouts { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -31,25 +36,43 @@ namespace RPG_dotnet.Data
                 .HasIndex(u => u.userName)
                 .IsUnique();
 
-            // Seed abilities
-            modelBuilder.Entity<Ability>().HasData(
-                new Ability
-                {
-                    id = 1,
-                    name = "Excalibur",
-                    description = "Unleashes a powerful beam of light.",
-                    manaCost = 30,
-                    damage = 40
-                },
-                new Ability
-                {
-                    id = 2,
-                    name = "Unlimited blade works",
-                    description = "Unleashes an arsenal of copied sacred treasures toward the target. - \"I am the bone of my sword \"",
-                    manaCost = 60,
-                    damage = 70
-                }
-            );
+            if (_seedAbilities)
+            {
+                modelBuilder.Entity<Ability>().HasData(
+                    new Ability
+                    {
+                        id = 1,
+                        name = "Excalibur",
+                        description = "Unleashes a powerful beam of light.",
+                        manaCost = 30,
+                        damage = 40,
+                        characterId = 0
+                    },
+                    new Ability
+                    {
+                        id = 2,
+                        name = "Unlimited blade works",
+                        description = "Unleashes an arsenal of copied sacred treasures toward the target. - \"I am the bone of my sword \"",
+                        manaCost = 60,
+                        damage = 70,
+                        characterId = 0
+                    }
+                );
+            }
+
+            //loadout
+            modelBuilder.Entity<LoadoutCharacter>()
+        .HasKey(lc => new { lc.loadoutId, lc.characterId });
+
+            modelBuilder.Entity<LoadoutCharacter>()
+                .HasOne(lc => lc.loadout)
+                .WithMany(l => l.characters)
+                .HasForeignKey(lc => lc.loadoutId);
+
+            modelBuilder.Entity<LoadoutCharacter>()
+                .HasOne(lc => lc.character)
+                .WithMany()
+                .HasForeignKey(lc => lc.characterId);
         }
     }
 }

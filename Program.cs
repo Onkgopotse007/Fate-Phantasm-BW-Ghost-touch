@@ -1,6 +1,8 @@
 global using RPG_dotnet.Models;
 global using RPG_dotnet.Services.CharactersService;
+global using RPG_dotnet.Services.LoadoutService;
 global using RPG_dotnet.Dtos.Characters;
+global using RPG_dotnet.Dtos.Loadout;
 global using AutoMapper;
 global using RPG_dotnet.Middleware;
 global using System.Net;
@@ -26,7 +28,6 @@ global using System.IdentityModel.Tokens.Jwt;
 global using Microsoft.AspNetCore.Authentication.JwtBearer;
 global using Microsoft.AspNetCore.Authorization;
 global using Swashbuckle.AspNetCore.Filters;
-global using RPG_dotnet.Services.TeamService;
 global using Microsoft.AspNetCore.Mvc.Filters;
 global using RPG_dotnet.Controllers;
 using Microsoft.OpenApi.Models;
@@ -56,8 +57,7 @@ builder.Services.AddSwaggerGen(c=>{
 builder.Services.AddAutoMapper(typeof(Program).Assembly);
 builder.Services.AddScoped<ICharacterService, CharacterService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<ITeamService, TeamService>();
-builder.Services.AddScoped<SetUserIdFilterAttribute>();
+builder.Services.AddScoped<ILoadoutService, LoadoutService>();
 builder.Services.AddScoped<AllowUnauthenticatedAttribute>();
 builder.Services.AddValidatorsFromAssemblyContaining<CreateCharacterReqValidator>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

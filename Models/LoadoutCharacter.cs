@@ -5,13 +5,11 @@ using System.Threading.Tasks;
 
 namespace RPG_dotnet.Models
 {
-    public class UserCharacter
+    public class LoadoutCharacter
     {
-        [Key]
-        public int id { get; set; }
+        public int loadoutId { get; set; }
+        public Loadout loadout { get; set; }
 
-        public int userId { get; set; }
-        public User user { get; set; }
         public int characterId { get; set; }
         public Characters character { get; set; }
     }

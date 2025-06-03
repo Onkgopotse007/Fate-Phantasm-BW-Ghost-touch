@@ -66,18 +66,28 @@ namespace RPG_dotnet.Services.CharactersService
         public async Task<ServiceResponse<GetCharacterDto>> GetCharacterById(int id)
         {
             var serviceResponse = new ServiceResponse<GetCharacterDto>();
-            var character = await _context.Characters.FirstOrDefaultAsync(c => c.id == id);
+
+            var character = await _context.Characters
+                .Include(c => c.abilities)
+                .FirstOrDefaultAsync(c => c.id == id);
+
             serviceResponse.data = _mapper.Map<GetCharacterDto>(character);
             return serviceResponse;
         }
 
-        public async Task<ServiceResponse<List<GetCharacterDto>>> GetCharacters(int userId)
+
+        public async Task<ServiceResponse<List<GetCharacterDto>>> GetAllCharacters()
         {
-            var serviceResponse = new ServiceResponse<List<GetCharacterDto>>();
-            var characters = await _context.Characters.ToListAsync();
-            serviceResponse.data = characters.Select(c => _mapper.Map<GetCharacterDto>(c)).ToList();
-            return serviceResponse;
+            var characters = await _context.Characters
+                .Include(c => c.abilities)
+                .ToListAsync();
+
+            return new ServiceResponse<List<GetCharacterDto>>
+            {
+                data = _mapper.Map<List<GetCharacterDto>>(characters)
+            };
         }
+
 
         public async Task<ServiceResponse<GetCharacterDto>> UpdateCharacter(UpdateCharacterDto updateCharacter)
         {
