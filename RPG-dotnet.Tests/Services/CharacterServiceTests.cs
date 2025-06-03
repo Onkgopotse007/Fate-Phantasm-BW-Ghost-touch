@@ -21,7 +21,7 @@ public class CharacterServiceTests
         var options = new DbContextOptionsBuilder<DataContext>()
             .UseInMemoryDatabase(databaseName: "CharacterServiceTestDb")
             .Options;
-        _context = new DataContext(options);
+        _context = new DataContext(options, seedAbilities: true);
 
         // Reset database between test runs
         _context.Database.EnsureDeleted();

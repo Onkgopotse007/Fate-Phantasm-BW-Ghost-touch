@@ -15,6 +15,8 @@ namespace RPG_dotnet.Models
         Avenger = 8
     }
 
+
+    [System.Text.Json.Serialization.JsonConverter(typeof(JsonStringEnumConverter))]
     public enum RoleType
     {
         Vanguard,
