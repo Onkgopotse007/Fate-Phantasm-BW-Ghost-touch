@@ -1,6 +1,7 @@
 global using RPG_dotnet.Models;
 global using RPG_dotnet.Services.CharactersService;
 global using RPG_dotnet.Services.LoadoutService;
+global using RPG_dotnet.Services.GameSessionService;
 global using RPG_dotnet.Dtos.Characters;
 global using RPG_dotnet.Dtos.Loadout;
 global using AutoMapper;
@@ -30,6 +31,7 @@ global using Microsoft.AspNetCore.Authorization;
 global using Swashbuckle.AspNetCore.Filters;
 global using Microsoft.AspNetCore.Mvc.Filters;
 global using RPG_dotnet.Controllers;
+global using RPG_dotnet.Dtos.GameSession;
 using Microsoft.OpenApi.Models;
 using dotenv.net;
 
@@ -37,7 +39,7 @@ var builder = WebApplication.CreateBuilder(args);
 DotEnv.Load();
 string connString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING");
 string token = Environment.GetEnvironmentVariable("TOKEN");
-if(connString is null || token is null)
+if (connString is null || token is null)
     throw new NotFoundException("Missing environment variables");
 // Add services to the container.
 builder.Services.AddDbContext<DataContext>(options =>
@@ -45,10 +47,12 @@ options.UseSqlServer(connString));
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c=>{
-    c.AddSecurityDefinition("oauth2", new OpenApiSecurityScheme{
+builder.Services.AddSwaggerGen(c =>
+{
+    c.AddSecurityDefinition("oauth2", new OpenApiSecurityScheme
+    {
         Description = """Standard Authorization header using the Bearer scheme. Example: "bearer {token}" """,
-        In= ParameterLocation.Header,
+        In = ParameterLocation.Header,
         Name = "Authorization",
         Type = SecuritySchemeType.ApiKey
     });
@@ -58,19 +62,20 @@ builder.Services.AddAutoMapper(typeof(Program).Assembly);
 builder.Services.AddScoped<ICharacterService, CharacterService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ILoadoutService, LoadoutService>();
+builder.Services.AddScoped<IGameSessionService, GameSessionService>();
 builder.Services.AddScoped<AllowUnauthenticatedAttribute>();
 builder.Services.AddValidatorsFromAssemblyContaining<CreateCharacterReqValidator>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options=>
+    .AddJwtBearer(options =>
     {
         options.TokenValidationParameters = new TokenValidationParameters
-            {
-                ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8
                     .GetBytes(token)),
-                ValidateIssuer = false,
-                ValidateAudience = false
-            };
+            ValidateIssuer = false,
+            ValidateAudience = false
+        };
         options.Events = new JwtBearerEvents
         {
             OnChallenge = async context =>
