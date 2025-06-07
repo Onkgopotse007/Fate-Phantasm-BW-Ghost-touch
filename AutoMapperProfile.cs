@@ -41,7 +41,9 @@ namespace RPG_dotnet
                     src.characters.Select(lc => lc.character)
                 ));
             //session automapper
-            CreateMap<GameSession, GetGameSessionDto>();
+            CreateMap<GameSession, GetGameSessionDto>()
+                .ForMember(dest => dest.creatorUsername, opt => opt.MapFrom(src => src.creatorUser.userName))
+                .ForMember(dest => dest.opponentUsername, opt => opt.MapFrom(src => src.opponentUser.userName));
 
             CreateMap<SessionCharacterState, GetSessionCharacterStateDto>()
                 .ForMember(dest => dest.characterName, opt => opt.MapFrom(src => src.character.name));
