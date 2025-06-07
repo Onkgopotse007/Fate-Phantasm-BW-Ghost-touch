@@ -22,4 +22,21 @@ namespace RPG_dotnet.Models
         Vanguard,
         Support
     }
+
+    [System.Text.Json.Serialization.JsonConverter(typeof(JsonStringEnumConverter))]
+    public enum GameSessionState
+    {
+        PENDING,
+        REJECTED,
+        ACTIVE,
+        COMPLETED,
+        ABANDONED
+    }
+
+    [System.Text.Json.Serialization.JsonConverter(typeof(JsonStringEnumConverter))]
+    public enum TeamSide
+    {
+        CREATOR,
+        OPPONENT
+    }
 }
