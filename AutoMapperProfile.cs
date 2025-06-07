@@ -38,8 +38,15 @@ namespace RPG_dotnet
                 .ForMember(dest => dest.loadoutId, opt => opt.MapFrom(src => src.loadoutId))
                 .ForMember(dest => dest.name, opt => opt.MapFrom(src => src.name))
                 .ForMember(dest => dest.characters, opt => opt.MapFrom(src =>
-                    src.characters.Select(lc => lc.character) // key fix here
+                    src.characters.Select(lc => lc.character)
                 ));
+            //session automapper
+            CreateMap<GameSession, GetGameSessionDto>()
+                .ForMember(dest => dest.creatorUsername, opt => opt.MapFrom(src => src.creatorUser.userName))
+                .ForMember(dest => dest.opponentUsername, opt => opt.MapFrom(src => src.opponentUser.userName));
+
+            CreateMap<SessionCharacterState, GetSessionCharacterStateDto>()
+                .ForMember(dest => dest.characterName, opt => opt.MapFrom(src => src.character.name));
         }
     }
 }

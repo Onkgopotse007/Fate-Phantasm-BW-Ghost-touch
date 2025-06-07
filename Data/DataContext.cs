@@ -22,6 +22,9 @@ namespace RPG_dotnet.Data
         public DbSet<Ability> Abilities => Set<Ability>();
         public DbSet<Loadout> Loadouts { get; set; }
 
+        public DbSet<GameSession> GameSessions { get; set; }
+        public DbSet<SessionCharacterState> SessionCharacterStates { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -62,7 +65,7 @@ namespace RPG_dotnet.Data
 
             //loadout
             modelBuilder.Entity<LoadoutCharacter>()
-        .HasKey(lc => new { lc.loadoutId, lc.characterId });
+                .HasKey(lc => new { lc.loadoutId, lc.characterId });
 
             modelBuilder.Entity<LoadoutCharacter>()
                 .HasOne(lc => lc.loadout)
@@ -73,6 +76,37 @@ namespace RPG_dotnet.Data
                 .HasOne(lc => lc.character)
                 .WithMany()
                 .HasForeignKey(lc => lc.characterId);
+
+            modelBuilder.Entity<GameSession>()
+                .HasMany(gs => gs.participants)
+                .WithOne(scs => scs.session)
+                .HasForeignKey(scs => scs.sessionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<SessionCharacterState>()
+                .HasOne(scs => scs.character)
+                .WithMany()
+                .HasForeignKey(scs => scs.characterId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<SessionCharacterState>()
+                .HasOne(scs => scs.user)
+                .WithMany()
+                .HasForeignKey(scs => scs.userId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<GameSession>()
+                .HasOne(gs => gs.creatorUser)
+                .WithMany()
+                .HasForeignKey(gs => gs.creatorUserId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+
+            modelBuilder.Entity<GameSession>()
+                .HasOne(gs => gs.opponentUser)
+                .WithMany()
+                .HasForeignKey(gs => gs.opponentUserId)
+                .OnDelete(DeleteBehavior.NoAction);
         }
     }
 }
