@@ -109,6 +109,8 @@ namespace RPG_dotnet.Services.GameSessionService
             var response = new ServiceResponse<GetGameSessionDto>();
 
             var session = await _context.GameSessions
+                .Include(gs => gs.creatorUser)
+                .Include(gs => gs.opponentUser)
                 .Include(gs => gs.participants)
                     .ThenInclude(p => p.character)
                 .FirstOrDefaultAsync(gs => gs.gameSessionId == sessionId) ?? throw new NotFoundException("Session not found.");
@@ -403,6 +405,8 @@ namespace RPG_dotnet.Services.GameSessionService
 
             var response = new ServiceResponse<List<GetGameSessionDto>>();
             var query = _context.GameSessions
+                .Include(gs => gs.creatorUser)
+                .Include(gs => gs.opponentUser)
                 .Include(gs => gs.participants)
                     .ThenInclude(p => p.character)
                 .Where(gs => gs.creatorUserId == userId || gs.opponentUserId == userId);
