@@ -1,6 +1,6 @@
-# dotnet-8-rpg
+# Fate-Phantasm
 
-*(originally dotnet-7-rpg — upgraded to .NET 8 for long-term support and stability)*
+*(originally done with dotnet-7-rpg — upgraded to .NET 8 for long-term support and stability)*
 
 ---
 
