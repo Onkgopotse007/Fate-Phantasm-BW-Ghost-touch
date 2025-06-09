@@ -87,9 +87,16 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 // TODO: implement logic to write error logs to file
 Log.Logger = new LoggerConfiguration()
     .Enrich.FromLogContext()
-    .WriteTo.Console(new ElasticsearchJsonFormatter(), restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Warning)
+    .MinimumLevel.Warning()
+    .WriteTo.Console(new ElasticsearchJsonFormatter())
+    .WriteTo.File(
+        path: "Logs/runtime-log-.txt",
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 7, 
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level}] {Message}{NewLine}{Exception}"
+    )
     .CreateLogger();
-builder.Logging.AddSerilog();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
