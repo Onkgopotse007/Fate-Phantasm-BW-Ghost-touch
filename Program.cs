@@ -34,12 +34,19 @@ global using RPG_dotnet.Controllers;
 global using RPG_dotnet.Dtos.GameSession;
 using Microsoft.OpenApi.Models;
 using dotenv.net;
+using Elastic.Apm.NetCoreAll;
+using Serilog.Debugging;
+using Serilog.Sinks.Elasticsearch;
+using Serilog.Sinks.File;
 
 var builder = WebApplication.CreateBuilder(args);
 DotEnv.Load();
 string connString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING");
 string token = Environment.GetEnvironmentVariable("TOKEN");
-if (connString is null || token is null)
+string esUri = Environment.GetEnvironmentVariable("ELASTIC_URI");
+string esUsername = Environment.GetEnvironmentVariable("ELASTIC_USERNAME");
+string esPassword = Environment.GetEnvironmentVariable("ELASTIC_PASSWORD");
+if (connString is null || token is null || esUri is null || esUsername is null || esPassword is null)
     throw new NotFoundException("Missing environment variables");
 // Add services to the container.
 builder.Services.AddDbContext<DataContext>(options =>
@@ -89,13 +96,21 @@ Log.Logger = new LoggerConfiguration()
     .Enrich.FromLogContext()
     .MinimumLevel.Warning()
     .WriteTo.Console(new ElasticsearchJsonFormatter())
-    .WriteTo.File(
-        path: "Logs/runtime-log-.txt",
-        rollingInterval: RollingInterval.Day,
-        retainedFileCountLimit: 7, 
-        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level}] {Message}{NewLine}{Exception}"
-    )
+    .WriteTo.Elasticsearch(new ElasticsearchSinkOptions(new Uri(esUri))
+    {
+        AutoRegisterTemplate = false,
+        IndexFormat = "dotnet-app-logs-{0:yyyy.MM}",
+        ModifyConnectionSettings = x => x
+            .ApiKeyAuthentication(esUsername, esPassword)
+            .ServerCertificateValidationCallback((sender, cert, chain, sslPolicyErrors) => true)
+            .RequestTimeout(TimeSpan.FromSeconds(60)),
+        EmitEventFailure = EmitEventFailureHandling.WriteToSelfLog |
+                           EmitEventFailureHandling.WriteToFailureSink |
+                           EmitEventFailureHandling.ThrowException
+    })
     .CreateLogger();
+
+builder.Host.UseSerilog();
 
 var app = builder.Build();
 
