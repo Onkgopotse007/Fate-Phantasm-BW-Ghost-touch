@@ -43,7 +43,10 @@ var builder = WebApplication.CreateBuilder(args);
 DotEnv.Load();
 string connString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING");
 string token = Environment.GetEnvironmentVariable("TOKEN");
-if (connString is null || token is null)
+string esUri = Environment.GetEnvironmentVariable("ELASTIC_URI");
+string esUsername = Environment.GetEnvironmentVariable("ELASTIC_USERNAME");
+string esPassword = Environment.GetEnvironmentVariable("ELASTIC_PASSWORD");
+if (connString is null || token is null || esUri is null || esUsername is null || esPassword is null)
     throw new NotFoundException("Missing environment variables");
 // Add services to the container.
 builder.Services.AddDbContext<DataContext>(options =>
