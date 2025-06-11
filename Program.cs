@@ -34,6 +34,10 @@ global using RPG_dotnet.Controllers;
 global using RPG_dotnet.Dtos.GameSession;
 using Microsoft.OpenApi.Models;
 using dotenv.net;
+using Elastic.Apm.NetCoreAll;
+using Serilog.Debugging;
+using Serilog.Sinks.Elasticsearch;
+using Serilog.Sinks.File;
 
 var builder = WebApplication.CreateBuilder(args);
 DotEnv.Load();
