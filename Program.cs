@@ -109,6 +109,7 @@ Log.Logger = new LoggerConfiguration()
                            EmitEventFailureHandling.ThrowException
     })
     .CreateLogger();
+builder.Services.AddAllElasticApm();
 builder.Host.UseSerilog();
 
 var app = builder.Build();
