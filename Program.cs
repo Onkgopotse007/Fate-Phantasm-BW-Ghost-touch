@@ -96,12 +96,18 @@ Log.Logger = new LoggerConfiguration()
     .Enrich.FromLogContext()
     .MinimumLevel.Warning()
     .WriteTo.Console(new ElasticsearchJsonFormatter())
-    .WriteTo.File(
-        path: "Logs/runtime-log-.txt",
-        rollingInterval: RollingInterval.Day,
-        retainedFileCountLimit: 7, 
-        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level}] {Message}{NewLine}{Exception}"
-    )
+    .WriteTo.Elasticsearch(new ElasticsearchSinkOptions(new Uri(esUri))
+    {
+        AutoRegisterTemplate = false,
+        IndexFormat = "dotnet-app-logs-{0:yyyy.MM}",
+        ModifyConnectionSettings = x => x
+            .ApiKeyAuthentication(esUsername, esPassword)
+            .ServerCertificateValidationCallback((sender, cert, chain, sslPolicyErrors) => true)
+            .RequestTimeout(TimeSpan.FromSeconds(60)),
+        EmitEventFailure = EmitEventFailureHandling.WriteToSelfLog |
+                           EmitEventFailureHandling.WriteToFailureSink |
+                           EmitEventFailureHandling.ThrowException
+    })
     .CreateLogger();
 
 var app = builder.Build();
