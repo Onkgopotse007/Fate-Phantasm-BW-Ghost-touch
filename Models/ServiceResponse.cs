@@ -10,7 +10,18 @@ namespace RPG_dotnet.Models
         public bool success { get; set; } = true;
         public required string message { get; set; }
         public T? data { get; set; }
-        
+
+        public static ServiceResponse<T> Success(T data, string message)
+        {
+            return new ServiceResponse<T>
+            {
+                success = true,
+                message = message,
+                data = data
+            };
+        }
+
+
     }
     public interface IServiceResponse
     {
