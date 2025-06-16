@@ -18,8 +18,6 @@ namespace RPG_dotnet.Services.LoadoutService
 
         public async Task<ServiceResponse<GetLoadoutDto>> CreateLoadoutAsync(int userId, CreateLoadoutDto dto)
         {
-            var response = new ServiceResponse<GetLoadoutDto>();
-
             var existingCount = await _context.Loadouts.CountAsync(l => l.userId == userId);
             if (existingCount >= 3)
             {
@@ -43,8 +41,7 @@ namespace RPG_dotnet.Services.LoadoutService
                 throw new BadRequestException("Exactly 2 valid characters must be provided.");
             }
 
-            if (!characters.Any(c => c.role == RoleType.Vanguard) ||
-                !characters.Any(c => c.role == RoleType.Support))
+            if (characters.All(c => c.role != RoleType.Vanguard) || characters.All(c => c.role != RoleType.Support))
             {
                 throw new BadRequestException("Loadout must contain one Vanguard and one Support character.");
             }
@@ -61,14 +58,12 @@ namespace RPG_dotnet.Services.LoadoutService
             _context.Loadouts.Add(loadout);
             await _context.SaveChangesAsync();
 
-            response.data = _mapper.Map<GetLoadoutDto>(loadout);
-            return response;
+            return ServiceResponse<GetLoadoutDto>.Success(_mapper.Map<GetLoadoutDto>(loadout),
+                "Loadout created successfully.");
         }
 
         public async Task<ServiceResponse<GetLoadoutDto>> UpdateLoadoutAsync(int userId, int loadoutId, UpdateLoadoutDto dto)
         {
-            var response = new ServiceResponse<GetLoadoutDto>();
-
             var loadout = await _context.Loadouts
                 .Include(l => l.characters)
                 .FirstOrDefaultAsync(l => l.loadoutId == loadoutId && l.userId == userId);
@@ -109,9 +104,8 @@ namespace RPG_dotnet.Services.LoadoutService
             }).ToList();
 
             await _context.SaveChangesAsync();
-
-            response.data = _mapper.Map<GetLoadoutDto>(loadout);
-            return response;
+            return ServiceResponse<GetLoadoutDto>.Success(_mapper.Map<GetLoadoutDto>(loadout),
+                $"Loadout {loadoutId} successfully updated.");
         }
 
 
@@ -121,12 +115,10 @@ namespace RPG_dotnet.Services.LoadoutService
                 .Where(l => l.userId == userId)
                 .Include(l => l.characters)
                 .ThenInclude(lc => lc.character)
-                .ToListAsync();
+                .ToListAsync() ?? throw new NotFoundException("Loadout not found.");
 
-            return new ServiceResponse<List<GetLoadoutDto>>
-            {
-                data = _mapper.Map<List<GetLoadoutDto>>(loadouts)
-            };
+            return ServiceResponse<List<GetLoadoutDto>>.Success(_mapper.Map<List<GetLoadoutDto>>(loadouts),
+                "Loadout list returned successfully.");
         }
     }
 }
