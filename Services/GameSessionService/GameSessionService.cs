@@ -21,8 +21,6 @@ namespace RPG_dotnet.Services.GameSessionService
 
         public async Task<ServiceResponse<GetGameSessionDto>> CreateGameSessionAsync(int userId, CreateGameSessionDto newSessionDto)
         {
-            var response = new ServiceResponse<GetGameSessionDto>();
-
             if (newSessionDto.characterIds == null || newSessionDto.characterIds.Count != 2)
             {
                 throw new GenericException("Exactly two character IDs must be provided to create a session.", 422);
@@ -79,44 +77,34 @@ namespace RPG_dotnet.Services.GameSessionService
 
             _context.GameSessions.Add(session);
             await _context.SaveChangesAsync();
-
-            response.data = _mapper.Map<GetGameSessionDto>(session);
-            response.success = true;
-            return response;
+            return ServiceResponse<GetGameSessionDto>.Success(_mapper.Map<GetGameSessionDto>(session), "Game Session created successfully." );
         }
         public async Task<ServiceResponse<List<GetGameSessionDto>>> GetActiveGameSessionsAsync(int userId)
         {
-            var response = new ServiceResponse<List<GetGameSessionDto>>();
-
             var sessions = await _context.GameSessions
                 .Where(gs => gs.state == GameSessionState.ACTIVE &&
-                    gs.participants.Any(p => p.userId == userId))
+                             gs.participants.Any(p => p.userId == userId))
                 .Include(gs => gs.creatorUser)
                 .Include(gs => gs.opponentUser)
                 .Include(gs => gs.participants)
-                    .ThenInclude(p => p.character)
+                .ThenInclude(p => p.character)
                 .Include(gs => gs.participants)
-                    .ThenInclude(p => p.user)
-                .ToListAsync();
+                .ThenInclude(p => p.user)
+                .ToListAsync() ?? throw new NotFoundException("Unable to find any active game sessions.");
 
-            response.data = sessions.Select(gs => _mapper.Map<GetGameSessionDto>(gs)).ToList();
-            response.success = true;
-            return response;
+            return ServiceResponse<List<GetGameSessionDto>>.Success(sessions.Select(gs => _mapper.Map<GetGameSessionDto>(gs)).ToList(), "Active game sessions found");
         }
 
         public async Task<ServiceResponse<GetGameSessionDto>> GetGameSessionByIdAsync(int sessionId)
         {
-            var response = new ServiceResponse<GetGameSessionDto>();
-
             var session = await _context.GameSessions
                 .Include(gs => gs.creatorUser)
                 .Include(gs => gs.opponentUser)
                 .Include(gs => gs.participants)
                     .ThenInclude(p => p.character)
                 .FirstOrDefaultAsync(gs => gs.gameSessionId == sessionId) ?? throw new NotFoundException("Session not found.");
-            response.data = _mapper.Map<GetGameSessionDto>(session);
-            response.success = true;
-            return response;
+
+            return ServiceResponse<GetGameSessionDto>.Success(_mapper.Map<GetGameSessionDto>(session), "Game session found");
         }
 
         public async Task<ServiceResponse<GetGameSessionDto>> MoveCharacterAsync(int userId, MoveActionDto dto)
@@ -164,11 +152,7 @@ namespace RPG_dotnet.Services.GameSessionService
 
             await _context.SaveChangesAsync();
 
-            return new ServiceResponse<GetGameSessionDto>
-            {
-                success = true,
-                data = _mapper.Map<GetGameSessionDto>(session)
-            };
+            return ServiceResponse<GetGameSessionDto>.Success(_mapper.Map<GetGameSessionDto>(session), "Character moved successfully");
         }
 
         public async Task<ServiceResponse<GetGameSessionDto>> AttackCharacterAsync(int userId, AttackCharacterDto dto)
@@ -222,16 +206,11 @@ namespace RPG_dotnet.Services.GameSessionService
 
             await _context.SaveChangesAsync();
 
-            return new ServiceResponse<GetGameSessionDto>
-            {
-                success = true,
-                data = _mapper.Map<GetGameSessionDto>(session)
-            };
+            return ServiceResponse<GetGameSessionDto>.Success(_mapper.Map<GetGameSessionDto>(session), "Character attacked successfully");
         }
 
         public async Task<ServiceResponse<GetGameSessionDto>> AbandonSessionAsync(int userId, int sessionId)
         {
-            var response = new ServiceResponse<GetGameSessionDto>();
 
             var session = await _context.GameSessions
                 .Include(gs => gs.participants)
@@ -240,17 +219,13 @@ namespace RPG_dotnet.Services.GameSessionService
 
             await _context.SaveChangesAsync();
 
-            response.data = _mapper.Map<GetGameSessionDto>(session);
-            response.success = true;
-            return response;
+            return ServiceResponse<GetGameSessionDto>.Success(_mapper.Map<GetGameSessionDto>(session), "User abandoned session successfully");
         }
 
         public async Task<ServiceResponse<GetGameSessionDto>> AcceptSessionAsync(int userId, AcceptGameSessionDto dto)
         {
-            var response = new ServiceResponse<GetGameSessionDto>();
-
             var session = await _context.GameSessions
-                .Include(gs => gs.participants)
+                .Include(gs => gs.participants).ThenInclude(sessionCharacterState => sessionCharacterState.user)
                 .FirstOrDefaultAsync(gs => gs.gameSessionId == dto.sessionId && gs.opponentUserId == userId) ?? throw new NotFoundException("Session not found.");
             if (session.state != GameSessionState.PENDING)
             {
@@ -305,35 +280,27 @@ namespace RPG_dotnet.Services.GameSessionService
             session.state = GameSessionState.ACTIVE;
             await _context.SaveChangesAsync();
 
-            response.data = _mapper.Map<GetGameSessionDto>(session);
-            response.success = true;
-            return response;
+            return ServiceResponse<GetGameSessionDto>.Success(_mapper.Map<GetGameSessionDto>(session),$"Session accepted, user {startingPlayer.user.userName} to start");
         }
 
         public async Task<ServiceResponse<GetGameSessionDto>> RejectSessionAsync(int userId, int sessionId)
         {
-            var response = new ServiceResponse<GetGameSessionDto>();
-
             var session = await _context.GameSessions
                 .Include(gs => gs.participants)
-                .FirstOrDefaultAsync(gs => gs.gameSessionId == sessionId) ?? throw new NotFoundException("Session not found.");
+                .FirstOrDefaultAsync(gs => gs.gameSessionId == sessionId && (gs.opponentUserId == userId)) ?? throw new NotFoundException("Session not found.");
             if (session.state != GameSessionState.PENDING)
             {
-                throw new GenericException("Only pending sessions can be rejected.", 422);
+                throw new GenericException("Only pending sessions can be rejected and only the opponent can reject a session", 422);
             }
 
             session.state = GameSessionState.REJECTED;
             await _context.SaveChangesAsync();
 
-            response.data = _mapper.Map<GetGameSessionDto>(session);
-            response.success = true;
-            return response;
+            return ServiceResponse<GetGameSessionDto>.Success(_mapper.Map<GetGameSessionDto>(session), $"Game session {sessionId}, rejected successfully.");
         }
 
         public async Task<ServiceResponse<GetGameSessionDto>> CastSpellAsync(int userId, CastSpellDto dto)
         {
-            var response = new ServiceResponse<GetGameSessionDto>();
-
             var session = await _context.GameSessions
                 .Include(gs => gs.participants)
                     .ThenInclude(p => p.character)
@@ -396,14 +363,11 @@ namespace RPG_dotnet.Services.GameSessionService
 
             await _context.SaveChangesAsync();
 
-            response.success = true;
-            response.data = _mapper.Map<GetGameSessionDto>(session);
-            return response;
+            return ServiceResponse<GetGameSessionDto>.Success(_mapper.Map<GetGameSessionDto>(session),
+                $"Spell {ability.name} cast successfully.");
         }
         public async Task<ServiceResponse<List<GetGameSessionDto>>> GetGameSessionsByUserIdAsync(int userId, GameSessionState? state = null)
         {
-
-            var response = new ServiceResponse<List<GetGameSessionDto>>();
             var query = _context.GameSessions
                 .Include(gs => gs.creatorUser)
                 .Include(gs => gs.opponentUser)
@@ -419,14 +383,11 @@ namespace RPG_dotnet.Services.GameSessionService
             if (!sessions.Any())
                 throw new NotFoundException("No game sessions found for the specified user");
 
-            response.data = sessions.Select(gs => _mapper.Map<GetGameSessionDto>(gs)).ToList();
-            response.success = true;
-            return response;
+            return ServiceResponse<List<GetGameSessionDto>>.Success(sessions.Select(gs => _mapper.Map<GetGameSessionDto>(gs)).ToList(), $"Game sessions for user {userId} found.");
         }
 
         public async Task<ServiceResponse<GetGameSessionDto>> JoinGameSessionAsync(JoinGameSessionDto dto)
         {
-            var response = new ServiceResponse<GetGameSessionDto>();
             var session = await _context.GameSessions
                 .Include(gs => gs.participants)
                 .FirstOrDefaultAsync(gs => gs.gameSessionId == dto.sessionId) ?? throw new NotFoundException("Game session not found");
@@ -476,7 +437,7 @@ namespace RPG_dotnet.Services.GameSessionService
 
             await _context.SaveChangesAsync();
 
-            response.data = new GetGameSessionDto
+            var data = new GetGameSessionDto
             {
                 gameSessionId = session.gameSessionId,
                 startedAt = session.startedAt,
@@ -505,7 +466,7 @@ namespace RPG_dotnet.Services.GameSessionService
                 }).ToList()
             };
 
-            return response;
+            return ServiceResponse<GetGameSessionDto>.Success(data, "Game session joined");
         }
 
     }
