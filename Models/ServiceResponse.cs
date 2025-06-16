@@ -8,7 +8,7 @@ namespace RPG_dotnet.Models
     public class ServiceResponse<T>
     {
         public bool success { get; set; } = true;
-        public string message { get; set; } = string.Empty;
+        public required string message { get; set; }
         public T? data { get; set; }
         
     }
