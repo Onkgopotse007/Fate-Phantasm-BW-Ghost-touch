@@ -10,10 +10,12 @@ namespace RPG_dotnet.Middleware
     public class ExceptionHandlingMiddleware
     {
         private readonly RequestDelegate _next;
+        private readonly ILogger<ExceptionHandlingMiddleware> _logger;
 
-        public ExceptionHandlingMiddleware(RequestDelegate next)
+        public ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger)
         {
             _next = next;
+            _logger = logger;
         }
 
         public async Task Invoke(HttpContext context)
@@ -25,94 +27,121 @@ namespace RPG_dotnet.Middleware
             catch (Exception ex)
             {
                 await HandleExceptionAsync(context, ex);
+                await HandleExceptionAsync(context, ex, _logger);
             }
         }
 
         private static Task HandleExceptionAsync(HttpContext context, Exception ex)
+        private static async Task HandleExceptionAsync(HttpContext context, Exception ex, ILogger<ExceptionHandlingMiddleware> logger)
         {
             var statusCode = (int)HttpStatusCode.InternalServerError;
-            var message = "An unexpected error occurred";
-            var data = new List<object>();
-            if (ex is NullReferenceException)
+            string responseMessage = ErrorMessages.INTERNAL_SERVER_ERROR;
+            object? responseData = null;
+
+            if (ex is AuthException authException)
             {
-                var notFoundException = new NotFoundException();
-                statusCode = notFoundException.StatusCode;
-                message = notFoundException.Message;
+                statusCode = authException.StatusCode;
+                responseMessage = authException.Message;
+                logger.LogWarning(authException, "{ResponseMessage} (Status: {StatusCode})", responseMessage, statusCode);
+            }
+            else if (ex is ConflictException conflictEx)
+            {
+                statusCode = conflictEx.StatusCode;
+                responseMessage = conflictEx.Message;
+                logger.LogWarning(conflictEx, "{ResponseMessage} (Status: {StatusCode})", responseMessage, statusCode);
+            }
+            else if (ex is NotFoundException notFoundEx)
+            {
+                statusCode = notFoundEx.StatusCode;
+                responseMessage = notFoundEx.Message;
+                logger.LogWarning(notFoundEx, "{ResponseMessage} (Status: {StatusCode})", responseMessage, statusCode);
+            }
+            else if (ex is FluentValidation.ValidationException validationException)
+            {
+                statusCode = (int)HttpStatusCode.BadRequest;
+                responseMessage = ErrorMessages.VALIDATION_ERROR;
+                responseData = validationException.Errors.Select(e => new
+                {
+                    propertyName = e.PropertyName,
+                    errorMessage = e.ErrorMessage
+                }).ToList<object>();
+                logger.LogWarning(validationException, "{ResponseMessage} (Status: {StatusCode}, Details: {ValidationErrors})", responseMessage, statusCode, responseData);
+            }
+            else if (ex is DbUpdateException updateException)
+            {
+                if (updateException.InnerException is SqlException sqlEx)
+                {
+                    if (sqlEx.Number == 2627 || sqlEx.Number == 2601)
+                    {
+                        statusCode = (int)HttpStatusCode.Conflict;
+                        responseMessage = ErrorMessages.CONFLICT_ERROR;
+                        logger.LogWarning(updateException, "{ResponseMessage} (SQL Error: {SqlErrorCode}, Status: {StatusCode})", responseMessage, sqlEx.Number, statusCode);
+                    }
+                    else
+                    {
+                        statusCode = (int)HttpStatusCode.InternalServerError;
+                        responseMessage = ErrorMessages.DATABASE_ERROR;
+                        logger.LogError(updateException, "{ResponseMessage} (SQL Error: {SqlErrorCode}, Status: {StatusCode})", responseMessage, sqlEx.Number, statusCode);
+                    }
+                }
+                else
+                {
+                    statusCode = (int)HttpStatusCode.InternalServerError;
+                    responseMessage = ErrorMessages.ORM_ERROR;
+                    logger.LogError(updateException, "{ResponseMessage} (Status: {StatusCode})", responseMessage, statusCode);
+                }
             }
             else if (ex is SqlException sqlException)
             {
                 if (sqlException.Number == 2627 || sqlException.Number == 2601)
                 {
-                    var conflictException = new ConflictException(sqlException.Message);
-                    statusCode = conflictException.StatusCode;
-                    message = conflictException.Message;
+                    statusCode = (int)HttpStatusCode.Conflict;
+                    responseMessage = ErrorMessages.CONFLICT_ERROR;
+                    logger.LogWarning(sqlException, "{ResponseMessage} (SQL Error: {SqlErrorCode}, Status: {StatusCode})", responseMessage, sqlException.Number, statusCode);
                 }
                 else
                 {
-                    var databaseException = new DatabaseException();
-                    statusCode = databaseException.StatusCode;
-                    message = databaseException.Message;
+                    statusCode = (int)HttpStatusCode.InternalServerError;
+                    responseMessage = ErrorMessages.DATABASE_ERROR;
+                    logger.LogError(sqlException, "{ResponseMessage} (SQL Error: {SqlErrorCode}, Status: {StatusCode})", responseMessage, sqlException.Number, statusCode);
                 }
             }
 
             else if (ex is BaseException baseException)
             {
                 statusCode = baseException.StatusCode;
-                message = ex.Message;
+                responseMessage = baseException.Message;
+                logger.LogWarning(baseException, "{ResponseMessage} (Status: {StatusCode})", responseMessage, statusCode);
             }
-            else if (ex is FluentValidation.ValidationException validationException)
+            else if (ex is NullReferenceException)
             {
-                statusCode = (int)HttpStatusCode.BadRequest;
-                message = validationException.Message;
-                data = validationException.Errors.Select(e => new
-                {
-                    PropertyName = e.PropertyName,
-                    ErrorMessage = e.ErrorMessage
-                }).ToList<object>();
-            }
-            else if (ex is DbUpdateException updateException)
-            {
-                if (ex.InnerException is Microsoft.Data.SqlClient.SqlException sqlEx && (sqlEx.Number == 2627 || sqlEx.Number == 2601))
-                {
-                    var conflictException = new ConflictException("One of the inputs is violating a unique key constraint");
-                    statusCode = conflictException.StatusCode;
-                    message = conflictException.Message;
-                }
-                else
-                {
-                    var databaseException = new DatabaseException();
-                    statusCode = databaseException.StatusCode;
-                    message = databaseException.Message;
-                }
-            }
-            else if(ex is AuthException authException){
-                statusCode = authException.StatusCode;
-                message = authException.Message;
+                statusCode = (int)HttpStatusCode.InternalServerError;
+                responseMessage = ErrorMessages.INTERNAL_SERVER_ERROR;
+                logger.LogError(ex, "{ResponseMessage} (Status: {StatusCode})", responseMessage, statusCode);
             }
             else
             {
-                GenericException genericException = new GenericException();
-                statusCode = genericException.StatusCode;
-                message = genericException.Message;
+                statusCode = (int)HttpStatusCode.InternalServerError;
+                responseMessage = ErrorMessages.INTERNAL_SERVER_ERROR;
+                logger.LogError(ex, "{ResponseMessage} (Status: {StatusCode})", responseMessage, statusCode);
             }
-            
+
 
             context.Response.StatusCode = statusCode;
 
-            var errorResponse = new
+
+            var serviceResponse = new ServiceResponse<object>
             {
                 success = false,
-                message = message,
-                exception = ex.GetType().Name,
-                data = data
+                message = responseMessage,
+                data = responseData
             };
             Log.Error(ex, $"An exception occurred {ex.Message}", data);
 
-            var jsonExceptionResponse = JsonConvert.SerializeObject(errorResponse);
+            var jsonExceptionResponse = JsonConvert.SerializeObject(serviceResponse);
 
             context.Response.ContentType = "application/json";
-
-            return context.Response.WriteAsync(jsonExceptionResponse);
+            await context.Response.WriteAsync(jsonExceptionResponse);
         }
     }
 }
