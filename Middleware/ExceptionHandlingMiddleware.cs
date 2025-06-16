@@ -1,10 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Security.Authentication;
-using System.Threading.Tasks;
-
-
 namespace RPG_dotnet.Middleware
 {
     public class ExceptionHandlingMiddleware
