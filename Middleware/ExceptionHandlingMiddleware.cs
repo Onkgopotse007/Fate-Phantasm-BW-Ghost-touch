@@ -26,12 +26,10 @@ namespace RPG_dotnet.Middleware
             }
             catch (Exception ex)
             {
-                await HandleExceptionAsync(context, ex);
                 await HandleExceptionAsync(context, ex, _logger);
             }
         }
 
-        private static Task HandleExceptionAsync(HttpContext context, Exception ex)
         private static async Task HandleExceptionAsync(HttpContext context, Exception ex, ILogger<ExceptionHandlingMiddleware> logger)
         {
             var statusCode = (int)HttpStatusCode.InternalServerError;
