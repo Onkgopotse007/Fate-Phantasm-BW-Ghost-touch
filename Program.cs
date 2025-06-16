@@ -37,6 +37,7 @@ using dotenv.net;
 using Elastic.Apm.NetCoreAll;
 using RPG_dotnet.Filters;
 using Serilog.Debugging;
+using Serilog.Events;
 using Serilog.Sinks.Elasticsearch;
 using Serilog.Sinks.File;
 
@@ -95,10 +96,30 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             }
         };
     });
-// TODO: implement logic to write error logs to file
 Log.Logger = new LoggerConfiguration()
     .Enrich.FromLogContext()
-    .MinimumLevel.Warning()
+    .MinimumLevel.Information()
+    // --- Start Overrides to reduce clutter from Microsoft and EF Core ---
+
+    // Suppress Information/Debug logs from most Microsoft components by default
+    // Only Warning, Error, and Fatal logs will pass through.
+    // will comment this out in the future and target the sources one by one, right now clutter has been reduced enough
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+
+    // This will suppress Info/Debug from core ASP.NET components
+    .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
+    // Hide EF Core queries
+    .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
+
+    // Specific override for the "Executed action..."
+    // This targets the ControllerActionInvoker specifically
+    .MinimumLevel.Override("Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker", LogEventLevel.Warning)
+
+    // Other common noisy sources
+    // .MinimumLevel.Override("Microsoft.AspNetCore.Hosting.Diagnostics", LogEventLevel.Warning) // For "Request starting/finished"
+    // .MinimumLevel.Override("Microsoft.AspNetCore.Routing.EndpointMiddleware", LogEventLevel.Warning) // For "Executing endpoint"
+
+
     .WriteTo.Console(new ElasticsearchJsonFormatter())
     .WriteTo.Elasticsearch(new ElasticsearchSinkOptions(new Uri(esUri))
     {
@@ -113,6 +134,8 @@ Log.Logger = new LoggerConfiguration()
                            EmitEventFailureHandling.ThrowException
     })
     .CreateLogger();
+
+builder.Services.AddSingleton(Log.Logger);
 
 builder.Host.UseSerilog();
 

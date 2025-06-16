@@ -136,7 +136,6 @@ namespace RPG_dotnet.Middleware
                 message = responseMessage,
                 data = responseData
             };
-            Log.Error(ex, $"An exception occurred {ex.Message}", data);
 
             var jsonExceptionResponse = JsonConvert.SerializeObject(serviceResponse);
 
