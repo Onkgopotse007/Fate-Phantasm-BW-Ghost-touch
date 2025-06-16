@@ -12,4 +12,10 @@ namespace RPG_dotnet.Models
         public T? data { get; set; }
         
     }
+    public interface IServiceResponse
+    {
+        bool success { get; }
+        string message { get; }
+    }
+
 }
