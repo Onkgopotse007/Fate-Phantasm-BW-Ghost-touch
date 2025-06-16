@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace RPG_dotnet.Models
 {
-    public class ServiceResponse<T>
+    public class ServiceResponse<T> : IServiceResponse
     {
         public bool success { get; set; } = true;
         public required string message { get; set; }
