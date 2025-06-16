@@ -120,6 +120,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseCorrelationId();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 //not needed for now app.UseHttpsRedirection();
 app.UseAuthentication();
