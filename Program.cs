@@ -35,6 +35,7 @@ global using RPG_dotnet.Dtos.GameSession;
 using Microsoft.OpenApi.Models;
 using dotenv.net;
 using Elastic.Apm.NetCoreAll;
+using RPG_dotnet.Filters;
 using Serilog.Debugging;
 using Serilog.Sinks.Elasticsearch;
 using Serilog.Sinks.File;
@@ -51,7 +52,10 @@ if (connString is null || token is null || esUri is null || esUsername is null |
 // Add services to the container.
 builder.Services.AddDbContext<DataContext>(options =>
 options.UseSqlServer(connString));
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<ServiceResponseLogFilter>();
+});
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
