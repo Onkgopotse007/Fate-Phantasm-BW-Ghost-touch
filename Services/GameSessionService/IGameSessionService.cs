@@ -15,8 +15,6 @@ namespace RPG_dotnet.Services.GameSessionService
         Task<ServiceResponse<GetGameSessionDto>> RejectSessionAsync(int userId, int sessionId);
         Task<ServiceResponse<GetGameSessionDto>> CastSpellAsync(int userId,CastSpellDto dto);
         Task<ServiceResponse<List<GetGameSessionDto>>> GetGameSessionsByUserIdAsync(int userId, GameSessionState? state = null);
-        Task<ServiceResponse<GetGameSessionDto>> JoinGameSessionAsync(JoinGameSessionDto dto);
-
-        
+        Task<ServiceResponse<GetGameSessionDto>> EndTurnAsync(int userId, EndTurnDto dto);
     }
 }

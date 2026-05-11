@@ -36,50 +36,55 @@ namespace RPG_dotnet.Helpers
 
         public static void AdvanceTurn(GameSession session)
         {
-            // Reset action flags if all alive participants have acted
-            if (session.participants.Where(p => p.isAlive).All(p => p.hasActedThisTurn))
+            var playerIds = session.participants
+                .Select(p => p.userId)
+                .Distinct()
+                .ToList();
+
+            if (playerIds.Count < 2) return;
+
+            int nextPlayerId = playerIds.First(id => id != session.currentTurnPlayerId);
+
+            // Reset the incoming player's characters for their turn
+            foreach (var p in session.participants.Where(p => p.userId == nextPlayerId && p.isAlive))
+                p.hasActedThisTurn = false;
+
+            // If all alive characters have now acted, it's a new full round
+            bool fullRoundComplete = session.participants
+                .Where(p => p.isAlive)
+                .All(p => p.hasActedThisTurn);
+
+            if (fullRoundComplete)
             {
-                foreach (var participant in session.participants.Where(p => p.isAlive))
-                {
-                    participant.hasActedThisTurn = false;
-                }
+                session.currentTurnIndex++;
+                foreach (var p in session.participants.Where(p => p.isAlive))
+                    p.hasActedThisTurn = false;
             }
 
-            // Move to next alive participant
-            int total = session.participants.Count;
-            for (int i = 1; i <= total; i++)
-            {
-                int nextIndex = (session.currentTurnIndex + i) % total;
-                if (session.participants[nextIndex].isAlive)
-                {
-                    session.currentTurnIndex = nextIndex;
-                    break;
-                }
-            }
+            session.currentTurnPlayerId = nextPlayerId;
         }
 
         public static void CheckVictoryCondition(GameSession session)
         {
-            var aliveUserIds = session.participants
+            var alivePlayerIds = session.participants
                 .Where(p => p.isAlive)
                 .Select(p => p.userId)
                 .Distinct()
                 .ToList();
 
-            if (aliveUserIds.Count <= 1)
+            if (alivePlayerIds.Count <= 1)
             {
                 session.state = GameSessionState.COMPLETED;
+                session.winnerUserId = alivePlayerIds.Count == 1 ? alivePlayerIds[0] : null;
             }
         }
 
         public static void EnsureUserTurn(GameSession session, int userId)
         {
-            var currentPlayer = session.participants.FirstOrDefault(p => p.user.id == session.currentTurnPlayerId) ?? throw new GenericException("Current turn player not found in session participants.", 422);
-            if (userId != currentPlayer.user.id)
-            {
+            if (session.currentTurnPlayerId != userId)
                 throw new GenericException("It is not your turn.", 422);
-            }
         }
+
         public static bool IsWithinProximity(float attackerX, float targetX, float allowedDistance = 10f)
         {
             return Math.Abs(attackerX - targetX) <= allowedDistance;

@@ -25,5 +25,7 @@ namespace RPG_dotnet.Dtos.GameSession
         public float maxPosition { get; set; }
 
         public List<GetSessionCharacterStateDto> participants { get; set; } = new();
+
+        public List<GetGameActionLogDto> actionLog { get; set; } = new();
     }
 }

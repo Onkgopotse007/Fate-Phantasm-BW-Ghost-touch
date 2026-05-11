@@ -24,7 +24,7 @@ namespace RPG_dotnet.Data
 
         public DbSet<GameSession> GameSessions { get; set; }
         public DbSet<SessionCharacterState> SessionCharacterStates { get; set; }
-
+        public DbSet<GameActionLog> GameActionLogs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -107,6 +107,12 @@ namespace RPG_dotnet.Data
                 .WithMany()
                 .HasForeignKey(gs => gs.opponentUserId)
                 .OnDelete(DeleteBehavior.NoAction);
+
+            modelBuilder.Entity<GameActionLog>()
+                .HasOne(log => log.session)
+                .WithMany(gs => gs.actionLog)
+                .HasForeignKey(log => log.sessionId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }

@@ -18,10 +18,7 @@ namespace RPG_dotnet.Controllers
         {
             var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
             var response = await _gameSessionService.CreateGameSessionAsync(userId, newSessionDto);
-
-            if (!response.success)
-                return BadRequest(response);
-
+            if (!response.success) return BadRequest(response);
             return Ok(response);
         }
 
@@ -29,63 +26,59 @@ namespace RPG_dotnet.Controllers
         public async Task<ActionResult<ServiceResponse<List<GetGameSessionDto>>>> GetActiveGameSessions()
         {
             var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
-            var response = await _gameSessionService.GetActiveGameSessionsAsync(userId);
-            return Ok(response);
+            return Ok(await _gameSessionService.GetActiveGameSessionsAsync(userId));
         }
+
 
         [HttpGet("{sessionId}")]
         public async Task<ActionResult<ServiceResponse<GetGameSessionDto>>> GetGameSessionById(int sessionId)
         {
             var response = await _gameSessionService.GetGameSessionByIdAsync(sessionId);
-            if (response.data is null)
-                return NotFound(response);
+            if (response.data is null) return NotFound(response);
             return Ok(response);
         }
 
         [HttpGet]
-        public async Task<ActionResult<ServiceResponse<List<GetGameSessionDto>>>> GetGameSessionsByUserId(GameSessionState? state = null)
+        public async Task<ActionResult<ServiceResponse<List<GetGameSessionDto>>>> GetGameSessionsByUserId(
+            GameSessionState? state = null)
         {
             var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
-            var response = await _gameSessionService.GetGameSessionsByUserIdAsync(userId, state);
-            return Ok(response);
+            return Ok(await _gameSessionService.GetGameSessionsByUserIdAsync(userId, state));
         }
 
         [HttpPut("move")]
-        public async Task<ActionResult<ServiceResponse<GetGameSessionDto>>> MoveCharacter(
-            MoveActionDto dto)
+        public async Task<ActionResult<ServiceResponse<GetGameSessionDto>>> MoveCharacter(MoveActionDto dto)
         {
             var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
             var response = await _gameSessionService.MoveCharacterAsync(userId, dto);
-
-            if (!response.success)
-                return BadRequest(response);
-
+            if (!response.success) return BadRequest(response);
             return Ok(response);
         }
 
         [HttpPut("attack")]
-        public async Task<ActionResult<ServiceResponse<GetGameSessionDto>>> AttackCharacter(
-            AttackCharacterDto dto)
+        public async Task<ActionResult<ServiceResponse<GetGameSessionDto>>> AttackCharacter(AttackCharacterDto dto)
         {
             var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
             var response = await _gameSessionService.AttackCharacterAsync(userId, dto);
-
-            if (!response.success)
-                return BadRequest(response);
-
+            if (!response.success) return BadRequest(response);
             return Ok(response);
         }
 
         [HttpPut("cast")]
-        public async Task<ActionResult<ServiceResponse<GetGameSessionDto>>> CastSpell(
-            CastSpellDto dto)
+        public async Task<ActionResult<ServiceResponse<GetGameSessionDto>>> CastSpell(CastSpellDto dto)
         {
             var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
             var response = await _gameSessionService.CastSpellAsync(userId, dto);
+            if (!response.success) return BadRequest(response);
+            return Ok(response);
+        }
 
-            if (!response.success)
-                return BadRequest(response);
-
+        [HttpPut("endturn")]
+        public async Task<ActionResult<ServiceResponse<GetGameSessionDto>>> EndTurn(EndTurnDto dto)
+        {
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
+            var response = await _gameSessionService.EndTurnAsync(userId, dto);
+            if (!response.success) return BadRequest(response);
             return Ok(response);
         }
 
@@ -94,10 +87,7 @@ namespace RPG_dotnet.Controllers
         {
             var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
             var response = await _gameSessionService.AbandonSessionAsync(userId, sessionId);
-
-            if (!response.success)
-                return BadRequest(response);
-
+            if (!response.success) return BadRequest(response);
             return Ok(response);
         }
 
@@ -106,10 +96,7 @@ namespace RPG_dotnet.Controllers
         {
             var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
             var response = await _gameSessionService.AcceptSessionAsync(userId, dto);
-
-            if (!response.success)
-                return BadRequest(response);
-
+            if (!response.success) return BadRequest(response);
             return Ok(response);
         }
 
@@ -118,10 +105,7 @@ namespace RPG_dotnet.Controllers
         {
             var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
             var response = await _gameSessionService.RejectSessionAsync(userId, sessionId);
-
-            if (!response.success)
-                return BadRequest(response);
-
+            if (!response.success) return BadRequest(response);
             return Ok(response);
         }
     }
