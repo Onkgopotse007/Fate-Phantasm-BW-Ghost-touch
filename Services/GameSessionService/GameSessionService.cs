@@ -68,12 +68,7 @@ namespace RPG_dotnet.Services.GameSessionService
             _context.GameSessions.Add(session);
             await _context.SaveChangesAsync();
 
-            return new ServiceResponse<GetGameSessionDto>
-            {
-                message = "Created new session successfully",
-                success = true,
-                data = _mapper.Map<GetGameSessionDto>(session)
-            };
+            return ServiceResponse<GetGameSessionDto>.Success(_mapper.Map<GetGameSessionDto>(session), "Created new session successfully");
         }
         public async Task<ServiceResponse<List<GetGameSessionDto>>> GetActiveGameSessionsAsync(int userId)
         {
@@ -82,12 +77,7 @@ namespace RPG_dotnet.Services.GameSessionService
                              gs.participants.Any(p => p.userId == userId))
                 .ToListAsync();
 
-            return new ServiceResponse<List<GetGameSessionDto>>
-            {
-                message = "Retrieved active sessions successfully",
-                success = true,
-                data = sessions.Select(gs => _mapper.Map<GetGameSessionDto>(gs)).ToList()
-            };
+            return ServiceResponse<List<GetGameSessionDto>>.Success(sessions.Select(gs => _mapper.Map<GetGameSessionDto>(gs)).ToList(), "Retrieved active sessions successfully");
         }
 
         public async Task<ServiceResponse<GetGameSessionDto>> GetGameSessionByIdAsync(int sessionId)
@@ -96,12 +86,7 @@ namespace RPG_dotnet.Services.GameSessionService
                               .FirstOrDefaultAsync(gs => gs.gameSessionId == sessionId)
                           ?? throw new NotFoundException("Session not found.");
 
-            return new ServiceResponse<GetGameSessionDto>
-            {
-                message = "Retrieved session successfully",
-                success = true,
-                data = _mapper.Map<GetGameSessionDto>(session)
-            };
+            return ServiceResponse<GetGameSessionDto>.Success(_mapper.Map<GetGameSessionDto>(session), "Retrieved session successfully");
         }
 
         public async Task<ServiceResponse<GetGameSessionDto>> MoveCharacterAsync(int userId, MoveActionDto dto)
@@ -217,12 +202,7 @@ namespace RPG_dotnet.Services.GameSessionService
             session.state = GameSessionState.ABANDONED;
             await _context.SaveChangesAsync();
 
-            return new ServiceResponse<GetGameSessionDto>
-            {
-                message = "Session abandoned successfully",
-                success = true,
-                data = _mapper.Map<GetGameSessionDto>(session)
-            };
+            return ServiceResponse<GetGameSessionDto>.Success(_mapper.Map<GetGameSessionDto>(session), "Session abandoned successfully");
         }
 
         public async Task<ServiceResponse<GetGameSessionDto>> AcceptSessionAsync(int userId, AcceptGameSessionDto dto)
@@ -274,12 +254,7 @@ namespace RPG_dotnet.Services.GameSessionService
 
             await _context.SaveChangesAsync();
 
-            return new ServiceResponse<GetGameSessionDto>
-            {
-                message = "Session accepted successfully",
-                success = true,
-                data = _mapper.Map<GetGameSessionDto>(session)
-            };
+            return ServiceResponse<GetGameSessionDto>.Success(_mapper.Map<GetGameSessionDto>(session), "Session accepted successfully");
         }
 
         public async Task<ServiceResponse<GetGameSessionDto>> RejectSessionAsync(int userId, int sessionId)
@@ -294,12 +269,7 @@ namespace RPG_dotnet.Services.GameSessionService
             session.state = GameSessionState.REJECTED;
             await _context.SaveChangesAsync();
 
-            return new ServiceResponse<GetGameSessionDto>
-            {
-                message = "Session rejected successfully",
-                success = true,
-                data = _mapper.Map<GetGameSessionDto>(session)
-            };
+            return ServiceResponse<GetGameSessionDto>.Success(_mapper.Map<GetGameSessionDto>(session), "Session rejected successfully");
         }
 
         public async Task<ServiceResponse<GetGameSessionDto>> CastSpellAsync(int userId, CastSpellDto dto)
@@ -359,12 +329,7 @@ namespace RPG_dotnet.Services.GameSessionService
 
             await _context.SaveChangesAsync();
 
-            return new ServiceResponse<GetGameSessionDto>
-            {
-                message = "Spell cast successfully",
-                success = true,
-                data = _mapper.Map<GetGameSessionDto>(session)
-            };
+            return ServiceResponse<GetGameSessionDto>.Success(_mapper.Map<GetGameSessionDto>(session), "Spell cast successfully");
         }
         public async Task<ServiceResponse<List<GetGameSessionDto>>> GetGameSessionsByUserIdAsync(int userId, GameSessionState? state = null)
         {
@@ -379,12 +344,7 @@ namespace RPG_dotnet.Services.GameSessionService
             if (!sessions.Any())
                 throw new NotFoundException("No game sessions found for the specified user.");
 
-            return new ServiceResponse<List<GetGameSessionDto>>
-            {
-                message = "Retrieved game sessions successfully",
-                success = true,
-                data = sessions.Select(gs => _mapper.Map<GetGameSessionDto>(gs)).ToList()
-            };
+            return ServiceResponse<List<GetGameSessionDto>>.Success(sessions.Select(gs => _mapper.Map<GetGameSessionDto>(gs)).ToList(), "Retrieved game sessions successfully");
         }
 
         public async Task<ServiceResponse<GetGameSessionDto>> EndTurnAsync(
@@ -406,12 +366,7 @@ namespace RPG_dotnet.Services.GameSessionService
 
             await _context.SaveChangesAsync();
 
-            return new ServiceResponse<GetGameSessionDto>
-            {
-                message = "Turn ended successfully",
-                success = true,
-                data = _mapper.Map<GetGameSessionDto>(session)
-            };
+            return ServiceResponse<GetGameSessionDto>.Success(_mapper.Map<GetGameSessionDto>(session), "Turn ended successfully");
         }
 
         private IQueryable<GameSession> SessionWithFullIncludes() =>
