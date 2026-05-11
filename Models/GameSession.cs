@@ -22,6 +22,7 @@ namespace RPG_dotnet.Models
         public int currentTurnPlayerId { get; set; }
 
         public List<SessionCharacterState> participants { get; set; } = new();
+        public List<GameActionLog> actionLog { get; set; } = new();
 
         // Position boundaries (e.g., linear board from 0 to 100)
         public float minPosition { get; set; } = 0f;

@@ -21,29 +21,17 @@ namespace RPG_dotnet.Services.GameSessionService
 
         public async Task<ServiceResponse<GetGameSessionDto>> CreateGameSessionAsync(int userId, CreateGameSessionDto newSessionDto)
         {
-            var response = new ServiceResponse<GetGameSessionDto>();
-
             if (newSessionDto.characterIds == null || newSessionDto.characterIds.Count != 2)
-            {
-                throw new GenericException("Exactly two character IDs must be provided to create a session.", 422);
-            }
+                throw new GenericException("Exactly two character IDs must be provided.", 422);
 
             var characters = await _context.Characters
                 .Where(c => newSessionDto.characterIds.Contains(c.id))
                 .ToListAsync();
 
             if (characters.Count != 2)
-            {
                 throw new GenericException("One or more character IDs are invalid.", 422);
-            }
 
-            bool hasSupport = characters.Any(c => c.role == RoleType.Support);
-            bool hasVanguard = characters.Any(c => c.role == RoleType.Vanguard);
-
-            if (!hasSupport || !hasVanguard)
-            {
-                throw new GenericException("A valid team must consist of one Support and one Vanguard character.", 422);
-            }
+            ValidateTeamComposition(characters);
 
             var session = new GameSession
             {
@@ -80,87 +68,70 @@ namespace RPG_dotnet.Services.GameSessionService
             _context.GameSessions.Add(session);
             await _context.SaveChangesAsync();
 
-            response.data = _mapper.Map<GetGameSessionDto>(session);
-            response.success = true;
-            return response;
+            return new ServiceResponse<GetGameSessionDto>
+            {
+                success = true,
+                data = _mapper.Map<GetGameSessionDto>(session)
+            };
         }
         public async Task<ServiceResponse<List<GetGameSessionDto>>> GetActiveGameSessionsAsync(int userId)
         {
-            var response = new ServiceResponse<List<GetGameSessionDto>>();
-
-            var sessions = await _context.GameSessions
+            var sessions = await SessionWithFullIncludes()
                 .Where(gs => gs.state == GameSessionState.ACTIVE &&
-                    gs.participants.Any(p => p.userId == userId))
-                .Include(gs => gs.creatorUser)
-                .Include(gs => gs.opponentUser)
-                .Include(gs => gs.participants)
-                    .ThenInclude(p => p.character)
-                .Include(gs => gs.participants)
-                    .ThenInclude(p => p.user)
+                             gs.participants.Any(p => p.userId == userId))
                 .ToListAsync();
 
-            response.data = sessions.Select(gs => _mapper.Map<GetGameSessionDto>(gs)).ToList();
-            response.success = true;
-            return response;
+            return new ServiceResponse<List<GetGameSessionDto>>
+            {
+                success = true,
+                data = sessions.Select(gs => _mapper.Map<GetGameSessionDto>(gs)).ToList()
+            };
         }
 
         public async Task<ServiceResponse<GetGameSessionDto>> GetGameSessionByIdAsync(int sessionId)
         {
-            var response = new ServiceResponse<GetGameSessionDto>();
+            var session = await SessionWithFullIncludes()
+                              .FirstOrDefaultAsync(gs => gs.gameSessionId == sessionId)
+                          ?? throw new NotFoundException("Session not found.");
 
-            var session = await _context.GameSessions
-                .Include(gs => gs.creatorUser)
-                .Include(gs => gs.opponentUser)
-                .Include(gs => gs.participants)
-                    .ThenInclude(p => p.character)
-                .FirstOrDefaultAsync(gs => gs.gameSessionId == sessionId) ?? throw new NotFoundException("Session not found.");
-            response.data = _mapper.Map<GetGameSessionDto>(session);
-            response.success = true;
-            return response;
+            return new ServiceResponse<GetGameSessionDto>
+            {
+                success = true,
+                data = _mapper.Map<GetGameSessionDto>(session)
+            };
         }
 
         public async Task<ServiceResponse<GetGameSessionDto>> MoveCharacterAsync(int userId, MoveActionDto dto)
         {
-            var session = await _context.GameSessions
-                .Include(gs => gs.participants)
-                    .ThenInclude(p => p.character)
-                .FirstOrDefaultAsync(gs => gs.gameSessionId == dto.sessionId && gs.state == GameSessionState.ACTIVE) ?? throw new NotFoundException("Active session not found.");
+            var session = await SessionWithFullIncludes()
+                              .FirstOrDefaultAsync(gs => gs.gameSessionId == dto.sessionId && gs.state == GameSessionState.ACTIVE)
+                          ?? throw new NotFoundException("Active session not found.");
+
             Functions.EnsureUserTurn(session, userId);
 
-            var character = session.participants.FirstOrDefault(p => p.characterId == dto.characterId && p.userId == userId) ?? throw new NotFoundException("Character not found in session or not owned by user.");
+            var character = session.participants
+                                .FirstOrDefault(p => p.characterId == dto.characterId && p.userId == userId)
+                            ?? throw new NotFoundException("Character not found in session or not owned by user.");
+
             if (!character.isAlive)
                 throw new GenericException("Character is not alive.", 400);
 
-            if (session.currentTurnPlayerId != userId)
-                throw new GenericException("Player has already acted this turn.", 400);
-
             if (character.role != RoleType.Vanguard)
-                throw new GenericException("Only Vanguard characters are allowed to move.", 403);
+                throw new GenericException("Only Vanguard characters can move.", 403);
 
-            int movement = character.character.movement;
-            int currentPos = (int)character.xPosition;
-            int newPos;
+            if (character.hasActedThisTurn)
+                throw new GenericException("This character has already acted this turn.", 400);
 
-            if (character.team == TeamSide.CREATOR)
-            {
-                newPos = (int)Math.Min(currentPos + movement, session.maxPosition);
-            }
-            else if (character.team == TeamSide.OPPONENT)
-            {
-                newPos = (int)Math.Max(currentPos - movement, session.minPosition);
-            }
-            else
-            {
-                throw new GenericException("Invalid team type for character.", 422);
-            }
+            float newPos = character.team == TeamSide.CREATOR
+                ? Math.Min(character.xPosition + character.character.movement, session.maxPosition)
+                : Math.Max(character.xPosition - character.character.movement, session.minPosition);
 
             character.xPosition = newPos;
             character.hasActedThisTurn = true;
 
-            var nextPlayer = session.participants.FirstOrDefault(p => p.userId != session.currentTurnPlayerId)
-                             ?? throw new GenericException("Could not complete turn", 422);
+            LogAction(session, GameActionType.Move, character.characterId, newPosition: newPos);
 
-            session.currentTurnPlayerId = nextPlayer.userId;
+            TryAdvanceTurn(session, userId);
 
             await _context.SaveChangesAsync();
 
@@ -173,52 +144,62 @@ namespace RPG_dotnet.Services.GameSessionService
 
         public async Task<ServiceResponse<GetGameSessionDto>> AttackCharacterAsync(int userId, AttackCharacterDto dto)
         {
-            var session = await _context.GameSessions
-                .Include(gs => gs.participants)
-                    .ThenInclude(p => p.character)
-                .FirstOrDefaultAsync(gs => gs.gameSessionId == dto.sessionId && gs.state == GameSessionState.ACTIVE) ?? throw new NotFoundException("Active session not found.");
+            var session = await SessionWithFullIncludes()
+                .FirstOrDefaultAsync(gs => gs.gameSessionId == dto.sessionId && gs.state == GameSessionState.ACTIVE)
+                ?? throw new NotFoundException("Active session not found.");
+
             Functions.EnsureUserTurn(session, userId);
 
-            var attacker = session.participants.FirstOrDefault(p => p.characterId == dto.attackerId && p.userId == userId);
-            var target = session.participants.FirstOrDefault(p => p.characterId == dto.targetId);
+            var attacker = session.participants
+                .FirstOrDefault(p => p.characterId == dto.attackerId && p.userId == userId)
+                ?? throw new NotFoundException("Attacker not found in session or not owned by user.");
 
-            if (attacker == null || target == null)
-                throw new NotFoundException("Invalid attacker or target.");
+            var target = session.participants
+                .FirstOrDefault(p => p.characterId == dto.targetId)
+                ?? throw new NotFoundException("Target not found in session.");
 
             if (!attacker.isAlive || !target.isAlive)
                 throw new GenericException("One or both characters are not alive.", 400);
 
-            if (attacker.character.role == RoleType.Vanguard && !Functions.IsWithinProximity(attacker.xPosition, target.xPosition))
-                throw new GenericException("Vanguard characters can only attack targets in close proximity.", 400);
+            // FIX #8: Support cannot basic attack. Their damage comes from CastSpell.
+            if (attacker.role != RoleType.Vanguard)
+                throw new GenericException("Only Vanguard characters can perform a basic attack.", 403);
 
+            if (!Functions.IsWithinProximity(attacker.xPosition, target.xPosition))
+                throw new GenericException("Vanguard can only attack targets in close proximity.", 400);
 
             if (attacker.hasActedThisTurn)
-                throw new GenericException("Attacker has already acted this turn.", 400);
+                throw new GenericException("This character has already acted this turn.", 400);
 
-            target.currentHealth -= attacker.character.baseDamage;
-            if (target.currentHealth <= 0)
-            {
-                target.isAlive = false;
-                target.currentHealth = 0;
-            }
+            if (target.userId == userId)
+                throw new GenericException("Cannot attack your own character.", 400);
 
-            if (attacker.currentMana < attacker.character.mana)
+            int damage = attacker.character.baseDamage;
+            target.currentHealth = Math.Max(0, target.currentHealth - damage);
+            if (target.currentHealth <= 0) target.isAlive = false;
+
+            double manaGained = 0;
+            if (attacker.currentMana < attacker.maxMana)
             {
+                double before = attacker.currentMana;
                 attacker.currentMana = Math.Min(
                     attacker.currentMana + attacker.character.manaGainPerAttack,
-                    attacker.character.mana
-                );
+                    attacker.maxMana);
+                manaGained = attacker.currentMana - before;
             }
 
             attacker.hasActedThisTurn = true;
 
-            var nextPlayer = session.participants.FirstOrDefault(p => p.userId != session.currentTurnPlayerId)
-                             ?? throw new GenericException("Could not complete turn", 422);
-
-            session.currentTurnPlayerId = nextPlayer.userId;
+            LogAction(session, GameActionType.Attack,
+                actorCharacterId: attacker.characterId,
+                targetCharacterId: target.characterId,
+                damageDealt: damage,
+                manaGained: manaGained);
 
             Functions.CheckVictoryCondition(session);
-            Functions.AdvanceTurn(session);
+
+            if (session.state == GameSessionState.ACTIVE)
+                TryAdvanceTurn(session, userId);
 
             await _context.SaveChangesAsync();
 
@@ -231,57 +212,44 @@ namespace RPG_dotnet.Services.GameSessionService
 
         public async Task<ServiceResponse<GetGameSessionDto>> AbandonSessionAsync(int userId, int sessionId)
         {
-            var response = new ServiceResponse<GetGameSessionDto>();
+            var session = await SessionWithFullIncludes()
+                              .FirstOrDefaultAsync(gs => gs.gameSessionId == sessionId &&
+                                                         gs.state != GameSessionState.ABANDONED)
+                          ?? throw new NotFoundException("Session not found.");
 
-            var session = await _context.GameSessions
-                .Include(gs => gs.participants)
-                .FirstOrDefaultAsync(gs => gs.gameSessionId == sessionId && gs.state != GameSessionState.ABANDONED) ?? throw new NotFoundException("Session not found.");
+            if (session.creatorUserId != userId && session.opponentUserId != userId)
+                throw new GenericException("You are not a participant in this session.", 403);
+
             session.state = GameSessionState.ABANDONED;
-
             await _context.SaveChangesAsync();
 
-            response.data = _mapper.Map<GetGameSessionDto>(session);
-            response.success = true;
-            return response;
+            return new ServiceResponse<GetGameSessionDto>
+            {
+                success = true,
+                data = _mapper.Map<GetGameSessionDto>(session)
+            };
         }
 
         public async Task<ServiceResponse<GetGameSessionDto>> AcceptSessionAsync(int userId, AcceptGameSessionDto dto)
         {
-            var response = new ServiceResponse<GetGameSessionDto>();
+            var session = await SessionWithFullIncludes()
+                .FirstOrDefaultAsync(gs => gs.gameSessionId == dto.sessionId && gs.opponentUserId == userId)
+                ?? throw new NotFoundException("Session not found.");
 
-            var session = await _context.GameSessions
-                .Include(gs => gs.participants)
-                .FirstOrDefaultAsync(gs => gs.gameSessionId == dto.sessionId && gs.opponentUserId == userId) ?? throw new NotFoundException("Session not found.");
             if (session.state != GameSessionState.PENDING)
-            {
-                throw new NotFoundException("Session is not in a pending state.");
-            }
+                throw new GenericException("Only pending sessions can be accepted.", 422);
 
             if (dto.characterIds == null || dto.characterIds.Count != 2)
-            {
-                throw new GenericException("Exactly two character IDs must be provided to create a session.", 422);
-            }
+                throw new GenericException("Exactly two character IDs must be provided.", 422);
 
             var characters = await _context.Characters
                 .Where(c => dto.characterIds.Contains(c.id))
                 .ToListAsync();
 
             if (characters.Count != 2)
-            {
                 throw new GenericException("One or more character IDs are invalid.", 422);
-            }
 
-            bool hasSupport = characters.Any(c => c.role == RoleType.Support);
-            bool hasVanguard = characters.Any(c => c.role == RoleType.Vanguard);
-
-            if (!hasSupport || !hasVanguard)
-            {
-                throw new GenericException("A valid team must consist of one Support and one Vanguard character.", 422);
-            }
-
-            var random = new Random();
-            var startingPlayer = session.participants[random.Next(session.participants.Count)];
-            session.currentTurnPlayerId = startingPlayer.userId;
+            ValidateTeamComposition(characters);
 
             foreach (var character in characters)
             {
@@ -290,7 +258,9 @@ namespace RPG_dotnet.Services.GameSessionService
                     session = session,
                     characterId = character.id,
                     userId = userId,
-                    xPosition = session.minPosition,
+                    // FIX #4: opponent starts at maxPosition not minPosition —
+                    // both teams were spawning at 0, facing the same direction.
+                    xPosition = session.maxPosition,
                     currentHealth = character.hitpoints,
                     maxHealth = character.hitpoints,
                     currentMana = 0.1 * character.mana,
@@ -302,113 +272,110 @@ namespace RPG_dotnet.Services.GameSessionService
                 });
             }
 
+            var random = new Random();
+            session.currentTurnPlayerId = random.Next(2) == 0
+                ? session.creatorUserId
+                : session.opponentUserId;
+            session.currentTurnIndex = 0;
             session.state = GameSessionState.ACTIVE;
+
             await _context.SaveChangesAsync();
 
-            response.data = _mapper.Map<GetGameSessionDto>(session);
-            response.success = true;
-            return response;
+            return new ServiceResponse<GetGameSessionDto>
+            {
+                success = true,
+                data = _mapper.Map<GetGameSessionDto>(session)
+            };
         }
 
         public async Task<ServiceResponse<GetGameSessionDto>> RejectSessionAsync(int userId, int sessionId)
         {
-            var response = new ServiceResponse<GetGameSessionDto>();
+            var session = await SessionWithFullIncludes()
+                              .FirstOrDefaultAsync(gs => gs.gameSessionId == sessionId && gs.opponentUserId == userId)
+                          ?? throw new NotFoundException("Session not found.");
 
-            var session = await _context.GameSessions
-                .Include(gs => gs.participants)
-                .FirstOrDefaultAsync(gs => gs.gameSessionId == sessionId) ?? throw new NotFoundException("Session not found.");
             if (session.state != GameSessionState.PENDING)
-            {
                 throw new GenericException("Only pending sessions can be rejected.", 422);
-            }
 
             session.state = GameSessionState.REJECTED;
             await _context.SaveChangesAsync();
 
-            response.data = _mapper.Map<GetGameSessionDto>(session);
-            response.success = true;
-            return response;
+            return new ServiceResponse<GetGameSessionDto>
+            {
+                success = true,
+                data = _mapper.Map<GetGameSessionDto>(session)
+            };
         }
 
         public async Task<ServiceResponse<GetGameSessionDto>> CastSpellAsync(int userId, CastSpellDto dto)
         {
-            var response = new ServiceResponse<GetGameSessionDto>();
+            var session = await SessionWithFullIncludes()
+                .FirstOrDefaultAsync(gs => gs.gameSessionId == dto.sessionId && gs.state == GameSessionState.ACTIVE)
+                ?? throw new NotFoundException("Game session not found.");
 
-            var session = await _context.GameSessions
-                .Include(gs => gs.participants)
-                    .ThenInclude(p => p.character)
-                        .ThenInclude(c => c.abilities)
-                .FirstOrDefaultAsync(gs => gs.gameSessionId == dto.sessionId) ?? throw new NotFoundException("Game session not found.");
-            Functions.EnsureUserTurn(session, dto.userId);
+            // FIX #5: only the JWT-sourced userId is used here
+            Functions.EnsureUserTurn(session, userId);
 
             var caster = session.participants
-                .FirstOrDefault(p => p.characterId == dto.casterId && p.userId == dto.userId);
+                .FirstOrDefault(p => p.characterId == dto.casterId && p.userId == userId)
+                ?? throw new GenericException("Caster not found or not owned by this user.", 422);
+
             var target = session.participants
-                .FirstOrDefault(p => p.characterId == dto.targetId);
+                .FirstOrDefault(p => p.characterId == dto.targetId)
+                ?? throw new GenericException("Target not found.", 422);
 
-            if (caster == null || !caster.isAlive)
-            {
-                throw new GenericException("Caster not found or is not alive.", 422);
-            }
+            if (!caster.isAlive)
+                throw new GenericException("Caster is not alive.", 422);
 
-            if (target == null || !target.isAlive)
-            {
-                throw new GenericException("Target not found or is not alive.", 422);
-            }
+            if (!target.isAlive)
+                throw new GenericException("Target is not alive.", 422);
 
-            if (caster.character.role == RoleType.Vanguard && !Functions.IsWithinProximity(caster.xPosition, target.xPosition))
+            if (caster.hasActedThisTurn)
+                throw new GenericException("This character has already acted this turn.", 400);
+
+            // FIX #8: Vanguard needs proximity to cast; Support can cast from anywhere
+            if (caster.role == RoleType.Vanguard &&
+                !Functions.IsWithinProximity(caster.xPosition, target.xPosition))
                 throw new GenericException("Vanguard characters can only cast spells on nearby targets.", 422);
 
-
-            if (session.currentTurnPlayerId != userId)
-            {
-                throw new GenericException("Caster has already acted this turn.", 422);
-            }
-
             var ability = caster.character.abilities
-                .FirstOrDefault(a => a.id == dto.abilityId) ?? throw new GenericException("Ability not found.", 422);
+                .FirstOrDefault(a => a.id == dto.abilityId)
+                ?? throw new GenericException("Ability not found on this character.", 422);
+
             if (caster.currentMana < ability.manaCost)
-            {
-                throw new GenericException("Not enough mana to cast the spell.", 422);
-            }
+                throw new GenericException("Not enough mana to cast this spell.", 422);
 
-            // Deduct mana and apply damage
             caster.currentMana -= ability.manaCost;
-            target.currentHealth -= ability.damage;
-
-            if (target.currentHealth <= 0)
-            {
-                target.currentHealth = 0;
-                target.isAlive = false;
-            }
+            int damage = ability.damage;
+            target.currentHealth = Math.Max(0, target.currentHealth - damage);
+            if (target.currentHealth <= 0) target.isAlive = false;
 
             caster.hasActedThisTurn = true;
 
-            // Change turn and check win conditions
-            var nextPlayer = session.participants
-                .FirstOrDefault(p => p.userId != session.currentTurnPlayerId)
-                ?? throw new GenericException("Could not complete turn", 422);
+            LogAction(session, GameActionType.CastSpell,
+                actorCharacterId: caster.characterId,
+                targetCharacterId: target.characterId,
+                abilityId: ability.id,
+                damageDealt: damage,
+                manaSpent: ability.manaCost);
 
-            session.currentTurnPlayerId = nextPlayer.userId;
-
+            // FIX #6 #9
             Functions.CheckVictoryCondition(session);
-            Functions.AdvanceTurn(session);
+
+            if (session.state == GameSessionState.ACTIVE)
+                TryAdvanceTurn(session, userId);
 
             await _context.SaveChangesAsync();
 
-            response.success = true;
-            response.data = _mapper.Map<GetGameSessionDto>(session);
-            return response;
+            return new ServiceResponse<GetGameSessionDto>
+            {
+                success = true,
+                data = _mapper.Map<GetGameSessionDto>(session)
+            };
         }
         public async Task<ServiceResponse<List<GetGameSessionDto>>> GetGameSessionsByUserIdAsync(int userId, GameSessionState? state = null)
         {
-
-            var response = new ServiceResponse<List<GetGameSessionDto>>();
-            var query = _context.GameSessions
-                .Include(gs => gs.creatorUser)
-                .Include(gs => gs.opponentUser)
-                .Include(gs => gs.participants)
-                    .ThenInclude(p => p.character)
+            var query = SessionWithFullIncludes()
                 .Where(gs => gs.creatorUserId == userId || gs.opponentUserId == userId);
 
             if (state.HasValue)
@@ -417,95 +384,97 @@ namespace RPG_dotnet.Services.GameSessionService
             var sessions = await query.ToListAsync();
 
             if (!sessions.Any())
-                throw new NotFoundException("No game sessions found for the specified user");
+                throw new NotFoundException("No game sessions found for the specified user.");
 
-            response.data = sessions.Select(gs => _mapper.Map<GetGameSessionDto>(gs)).ToList();
-            response.success = true;
-            return response;
+            return new ServiceResponse<List<GetGameSessionDto>>
+            {
+                success = true,
+                data = sessions.Select(gs => _mapper.Map<GetGameSessionDto>(gs)).ToList()
+            };
         }
 
-        public async Task<ServiceResponse<GetGameSessionDto>> JoinGameSessionAsync(JoinGameSessionDto dto)
+        public async Task<ServiceResponse<GetGameSessionDto>> EndTurnAsync(
+            int userId, EndTurnDto dto)
         {
-            var response = new ServiceResponse<GetGameSessionDto>();
-            var session = await _context.GameSessions
-                .Include(gs => gs.participants)
-                .FirstOrDefaultAsync(gs => gs.gameSessionId == dto.sessionId) ?? throw new NotFoundException("Game session not found");
-            if (session.opponentUserId != dto.opponentUserId)
-                throw new GenericException("You are not authorized to join this session", 403);
+            var session = await SessionWithFullIncludes()
+                              .FirstOrDefaultAsync(gs => gs.gameSessionId == dto.sessionId && gs.state == GameSessionState.ACTIVE)
+                          ?? throw new NotFoundException("Active session not found.");
 
-            if (session.state != GameSessionState.PENDING)
-                throw new GenericException("This session is not joinable", 400);
+            Functions.EnsureUserTurn(session, userId);
 
-            if (session.participants.Any(p => p.userId == dto.opponentUserId))
-                throw new GenericException("You have already joined this session", 400);
+            foreach (var p in session.participants.Where(p => p.userId == userId && p.isAlive))
+                p.hasActedThisTurn = true;
 
-            var characters = await _context.Characters
-                .Where(c => dto.characterIds.Contains(c.id))
-                .ToListAsync();
+            LogAction(session, GameActionType.EndTurn,
+                actorCharacterId: session.participants.First(p => p.userId == userId).characterId);
 
-            if (characters.Count != dto.characterIds.Count)
-                throw new GenericException("One or more characters are invalid or do not belong to the user", 400);
-
-            foreach (var character in characters)
-            {
-                session.participants.Add(new SessionCharacterState
-                {
-                    sessionId = session.gameSessionId,
-                    characterId = character.id,
-                    userId = dto.opponentUserId,
-                    character = character,
-                    currentHealth = character.hitpoints,
-                    currentMana = 0.1 * character.mana,
-                    maxHealth = character.hitpoints,
-                    maxMana = character.mana,
-                    isAlive = true,
-                    role = character.role,
-                    hasActedThisTurn = false,
-                    xPosition = session.maxPosition,
-                    team = TeamSide.OPPONENT
-                });
-            }
-
-            session.state = GameSessionState.ACTIVE;
-            var random = new Random();
-            session.currentTurnPlayerId = random.Next(0, 2) == 0
-                ? session.creatorUserId
-                : session.opponentUserId;
-
-            session.currentTurnIndex = 0;
+            Functions.AdvanceTurn(session);
 
             await _context.SaveChangesAsync();
 
-            response.data = new GetGameSessionDto
+            return new ServiceResponse<GetGameSessionDto>
             {
-                gameSessionId = session.gameSessionId,
-                startedAt = session.startedAt,
-                state = session.state,
-                currentTurnIndex = session.currentTurnIndex,
-                currentTurnPlayerId = session.currentTurnPlayerId,
-                winnerUserId = session.winnerUserId,
-                minPosition = session.minPosition,
-                maxPosition = session.maxPosition,
-                participants = session.participants.Select(p => new GetSessionCharacterStateDto
-                {
-                    sessionCharacterId = p.sessionCharacterId,
-                    sessionId = p.sessionId,
-                    characterId = p.characterId,
-                    characterName = p.character?.name ?? "Unknown",
-                    userId = p.userId,
-                    currentHealth = p.currentHealth,
-                    currentMana = p.currentMana,
-                    maxHealth = p.maxHealth,
-                    maxMana = p.maxMana,
-                    isAlive = p.isAlive,
-                    role = p.role,
-                    hasActedThisTurn = p.hasActedThisTurn,
-                    xPosition = p.xPosition,
-                    team = p.team
-                }).ToList()
+                success = true,
+                data = _mapper.Map<GetGameSessionDto>(session)
             };
+        }
 
-            return response;
+        private IQueryable<GameSession> SessionWithFullIncludes() =>
+            _context.GameSessions
+                .Include(gs => gs.creatorUser)
+                .Include(gs => gs.opponentUser)
+                .Include(gs => gs.participants)
+                .ThenInclude(p => p.character)
+                .ThenInclude(c => c.abilities)
+                .Include(gs => gs.participants)
+                .ThenInclude(p => p.user)
+                .Include(gs => gs.actionLog);
+
+        private static void LogAction(
+            GameSession session,
+            GameActionType actionType,
+            int actorCharacterId,
+            int? targetCharacterId = null,
+            int? abilityId = null,
+            int damageDealt = 0,
+            double manaSpent = 0,
+            double manaGained = 0,
+            float? newPosition = null)
+        {
+            session.actionLog.Add(new GameActionLog
+            {
+                sessionId = session.gameSessionId,
+                actorCharacterId = actorCharacterId,
+                targetCharacterId = targetCharacterId,
+                actionType = actionType,
+                abilityId = abilityId,
+                damageDealt = damageDealt,
+                manaSpent = manaSpent,
+                manaGained = manaGained,
+                newPosition = newPosition,
+                turnIndex = session.currentTurnIndex,
+                timestamp = DateTime.UtcNow
+            });
+        }
+
+        private static void TryAdvanceTurn(GameSession session, int userId)
+        {
+            bool allActed = session.participants
+                .Where(p => p.userId == userId && p.isAlive)
+                .All(p => p.hasActedThisTurn);
+
+            if (allActed)
+                Functions.AdvanceTurn(session);
+        }
+
+        private static void ValidateTeamComposition(List<Characters> characters)
+        {
+            bool hasSupport = characters.Any(c => c.role == RoleType.Support);
+            bool hasVanguard = characters.Any(c => c.role == RoleType.Vanguard);
+
+            if (!hasSupport || !hasVanguard)
+                throw new GenericException(
+                    "A valid team must consist of one Support and one Vanguard character.", 422);
         }
 
     }

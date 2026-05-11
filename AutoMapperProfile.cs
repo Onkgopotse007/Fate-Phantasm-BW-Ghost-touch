@@ -47,6 +47,8 @@ namespace RPG_dotnet
 
             CreateMap<SessionCharacterState, GetSessionCharacterStateDto>()
                 .ForMember(dest => dest.characterName, opt => opt.MapFrom(src => src.character.name));
+
+            CreateMap<GameActionLog, GetGameActionLogDto>();
         }
     }
 }
