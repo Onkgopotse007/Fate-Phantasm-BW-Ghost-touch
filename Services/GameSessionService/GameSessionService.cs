@@ -70,6 +70,7 @@ namespace RPG_dotnet.Services.GameSessionService
 
             return new ServiceResponse<GetGameSessionDto>
             {
+                message = "Created new session successfully",
                 success = true,
                 data = _mapper.Map<GetGameSessionDto>(session)
             };
@@ -83,6 +84,7 @@ namespace RPG_dotnet.Services.GameSessionService
 
             return new ServiceResponse<List<GetGameSessionDto>>
             {
+                message = "Retrieved active sessions successfully",
                 success = true,
                 data = sessions.Select(gs => _mapper.Map<GetGameSessionDto>(gs)).ToList()
             };
@@ -96,6 +98,7 @@ namespace RPG_dotnet.Services.GameSessionService
 
             return new ServiceResponse<GetGameSessionDto>
             {
+                message = "Retrieved session successfully",
                 success = true,
                 data = _mapper.Map<GetGameSessionDto>(session)
             };
@@ -216,6 +219,7 @@ namespace RPG_dotnet.Services.GameSessionService
 
             return new ServiceResponse<GetGameSessionDto>
             {
+                message = "Session abandoned successfully",
                 success = true,
                 data = _mapper.Map<GetGameSessionDto>(session)
             };
@@ -272,6 +276,7 @@ namespace RPG_dotnet.Services.GameSessionService
 
             return new ServiceResponse<GetGameSessionDto>
             {
+                message = "Session accepted successfully",
                 success = true,
                 data = _mapper.Map<GetGameSessionDto>(session)
             };
@@ -291,6 +296,7 @@ namespace RPG_dotnet.Services.GameSessionService
 
             return new ServiceResponse<GetGameSessionDto>
             {
+                message = "Session rejected successfully",
                 success = true,
                 data = _mapper.Map<GetGameSessionDto>(session)
             };
@@ -355,6 +361,7 @@ namespace RPG_dotnet.Services.GameSessionService
 
             return new ServiceResponse<GetGameSessionDto>
             {
+                message = "Spell cast successfully",
                 success = true,
                 data = _mapper.Map<GetGameSessionDto>(session)
             };
@@ -374,6 +381,7 @@ namespace RPG_dotnet.Services.GameSessionService
 
             return new ServiceResponse<List<GetGameSessionDto>>
             {
+                message = "Retrieved game sessions successfully",
                 success = true,
                 data = sessions.Select(gs => _mapper.Map<GetGameSessionDto>(gs)).ToList()
             };
@@ -400,6 +408,7 @@ namespace RPG_dotnet.Services.GameSessionService
 
             return new ServiceResponse<GetGameSessionDto>
             {
+                message = "Turn ended successfully",
                 success = true,
                 data = _mapper.Map<GetGameSessionDto>(session)
             };
