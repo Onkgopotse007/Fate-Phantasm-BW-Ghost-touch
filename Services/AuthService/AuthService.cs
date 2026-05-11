@@ -19,7 +19,7 @@ namespace RPG_dotnet.Data
         {
             Functions functions = new Functions();
 
-            var response = new ServiceResponse<UserLoginResponse>();
+
             var user = await _context.Users
                 .FirstOrDefaultAsync(u => u.userName.Equals(userName));
             if (user is null || !functions.VerifyPasswordHash(password, user.passwordHash, user.passwordSalt))
@@ -28,15 +28,14 @@ namespace RPG_dotnet.Data
             }
             else
             {
-                response.data = new UserLoginResponse { token = CreateToken(user) };
-                return response;
+                return ServiceResponse<UserLoginResponse>.Success(new UserLoginResponse { token = CreateToken(user) },
+                    "Authentication Successful");
             }
 
         }
 
         public async Task<ServiceResponse<UserRegistrationResponse>> Register(User user, string password)
         {
-            var response = new ServiceResponse<UserRegistrationResponse>();
             Functions functions = new Functions();
             if (await UserExists(user.userName))
             {
@@ -48,9 +47,8 @@ namespace RPG_dotnet.Data
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
-            response.data = new UserRegistrationResponse { user_id = user.id };
-            response.message = "New user created";
-            return response;
+            return ServiceResponse<UserRegistrationResponse>.Success(new UserRegistrationResponse { user_id = user.id },
+                "New user created");
         }
 
         public async Task<bool> UserExists(string userName)

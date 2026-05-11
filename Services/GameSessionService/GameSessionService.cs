@@ -135,11 +135,7 @@ namespace RPG_dotnet.Services.GameSessionService
 
             await _context.SaveChangesAsync();
 
-            return new ServiceResponse<GetGameSessionDto>
-            {
-                success = true,
-                data = _mapper.Map<GetGameSessionDto>(session)
-            };
+            return ServiceResponse<GetGameSessionDto>.Success(_mapper.Map<GetGameSessionDto>(session), "Character moved successfully");
         }
 
         public async Task<ServiceResponse<GetGameSessionDto>> AttackCharacterAsync(int userId, AttackCharacterDto dto)
@@ -202,11 +198,7 @@ namespace RPG_dotnet.Services.GameSessionService
 
             await _context.SaveChangesAsync();
 
-            return new ServiceResponse<GetGameSessionDto>
-            {
-                success = true,
-                data = _mapper.Map<GetGameSessionDto>(session)
-            };
+            return ServiceResponse<GetGameSessionDto>.Success(_mapper.Map<GetGameSessionDto>(session), "Character attacked successfully");
         }
 
         public async Task<ServiceResponse<GetGameSessionDto>> AbandonSessionAsync(int userId, int sessionId)
