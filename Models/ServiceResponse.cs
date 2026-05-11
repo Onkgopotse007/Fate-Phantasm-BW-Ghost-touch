@@ -20,8 +20,15 @@ namespace RPG_dotnet.Models
                 data = data
             };
         }
-
-
+        public static ServiceResponse<T> Fail(string message)
+        {
+            return new ServiceResponse<T>
+            {
+                success = false,
+                message = message,
+                data = default
+            };
+        }
     }
     public interface IServiceResponse
     {
