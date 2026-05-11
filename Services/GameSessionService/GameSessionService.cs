@@ -161,7 +161,6 @@ namespace RPG_dotnet.Services.GameSessionService
             if (!attacker.isAlive || !target.isAlive)
                 throw new GenericException("One or both characters are not alive.", 400);
 
-            // FIX #8: Support cannot basic attack. Their damage comes from CastSpell.
             if (attacker.role != RoleType.Vanguard)
                 throw new GenericException("Only Vanguard characters can perform a basic attack.", 403);
 
@@ -258,8 +257,6 @@ namespace RPG_dotnet.Services.GameSessionService
                     session = session,
                     characterId = character.id,
                     userId = userId,
-                    // FIX #4: opponent starts at maxPosition not minPosition —
-                    // both teams were spawning at 0, facing the same direction.
                     xPosition = session.maxPosition,
                     currentHealth = character.hitpoints,
                     maxHealth = character.hitpoints,
@@ -313,7 +310,6 @@ namespace RPG_dotnet.Services.GameSessionService
                 .FirstOrDefaultAsync(gs => gs.gameSessionId == dto.sessionId && gs.state == GameSessionState.ACTIVE)
                 ?? throw new NotFoundException("Game session not found.");
 
-            // FIX #5: only the JWT-sourced userId is used here
             Functions.EnsureUserTurn(session, userId);
 
             var caster = session.participants
@@ -333,7 +329,6 @@ namespace RPG_dotnet.Services.GameSessionService
             if (caster.hasActedThisTurn)
                 throw new GenericException("This character has already acted this turn.", 400);
 
-            // FIX #8: Vanguard needs proximity to cast; Support can cast from anywhere
             if (caster.role == RoleType.Vanguard &&
                 !Functions.IsWithinProximity(caster.xPosition, target.xPosition))
                 throw new GenericException("Vanguard characters can only cast spells on nearby targets.", 422);
@@ -359,7 +354,6 @@ namespace RPG_dotnet.Services.GameSessionService
                 damageDealt: damage,
                 manaSpent: ability.manaCost);
 
-            // FIX #6 #9
             Functions.CheckVictoryCondition(session);
 
             if (session.state == GameSessionState.ACTIVE)
