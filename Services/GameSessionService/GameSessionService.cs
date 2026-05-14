@@ -25,7 +25,7 @@ namespace RPG_dotnet.Services.GameSessionService
                 throw new GenericException("Exactly two character IDs must be provided.", 422);
 
             var characters = await _context.Characters
-                .Where(c => newSessionDto.characterIds.Contains(c.id))
+                .Where(c => newSessionDto.characterIds.Contains(c.id) && c.isPlayable)
                 .ToListAsync();
 
             if (characters.Count != 2)
@@ -218,7 +218,7 @@ namespace RPG_dotnet.Services.GameSessionService
                 throw new GenericException("Exactly two character IDs must be provided.", 422);
 
             var characters = await _context.Characters
-                .Where(c => dto.characterIds.Contains(c.id))
+                .Where(c => dto.characterIds.Contains(c.id) && c.isPlayable)
                 .ToListAsync();
 
             if (characters.Count != 2)

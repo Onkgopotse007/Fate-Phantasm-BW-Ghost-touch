@@ -17,6 +17,8 @@ namespace RPG_dotnet.Models
         public int movement { get; set; } = 2;
         public int baseDamage { get; set; } = 10;
         public int manaGainPerAttack { get; set; } = 10;
+        public string description { get; set; } = "A young warrior with a long history of victory.";
+        public bool isPlayable { get; set; }
         public RpgClass fighterClass { get; set; } = RpgClass.Archer;
         public RoleType role { get; set; } = RoleType.Vanguard;
         public List<Ability> abilities { get; set; } = new();
