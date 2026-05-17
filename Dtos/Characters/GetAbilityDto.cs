@@ -11,8 +11,10 @@ namespace RPG_dotnet.Dtos.Characters
         public string name { get; set; }
         public string effect { get; set; }
         public int manaCost { get; set; }
-
         public int damage { get; set; }
+        public string description { get; set; } = string.Empty;
+        public int effectValue { get; set; }
+        public AbilityTargetType targetType { get; set; }
     }
 
 }

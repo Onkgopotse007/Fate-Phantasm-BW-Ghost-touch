@@ -19,19 +19,13 @@ namespace RPG_dotnet.Services.GameSessionService
             _mapper = mapper;
         }
 
-        public async Task<ServiceResponse<GetGameSessionDto>> CreateGameSessionAsync(int userId, CreateGameSessionDto newSessionDto)
+        public async Task<ServiceResponse<GetGameSessionDto>> CreateGameSessionAsync(
+            int userId, CreateGameSessionDto newSessionDto)
         {
             if (newSessionDto.characterIds == null || newSessionDto.characterIds.Count != 2)
                 throw new GenericException("Exactly two character IDs must be provided.", 422);
 
-            var characters = await _context.Characters
-                .Where(c => newSessionDto.characterIds.Contains(c.id))
-                .ToListAsync();
-
-            if (characters.Count != 2)
-                throw new GenericException("One or more character IDs are invalid.", 422);
-
-            ValidateTeamComposition(characters);
+            var characters = await LoadAndValidateCharactersAsync(newSessionDto.characterIds);
 
             var session = new GameSession
             {
@@ -61,15 +55,21 @@ namespace RPG_dotnet.Services.GameSessionService
                     isAlive = true,
                     role = character.role,
                     hasActedThisTurn = false,
-                    team = TeamSide.CREATOR
+                    team = TeamSide.CREATOR,
+                    reviveCount = character.fighterClass == RpgClass.Berserker ? 1 : 0
                 });
             }
 
             _context.GameSessions.Add(session);
             await _context.SaveChangesAsync();
 
-            return ServiceResponse<GetGameSessionDto>.Success(_mapper.Map<GetGameSessionDto>(session), "Created new session successfully");
+            var created = await SessionWithFullIncludes()
+                .FirstAsync(gs => gs.gameSessionId == session.gameSessionId);
+
+            return ServiceResponse<GetGameSessionDto>.Success(
+                _mapper.Map<GetGameSessionDto>(created), "Created new session successfully");
         }
+
         public async Task<ServiceResponse<List<GetGameSessionDto>>> GetActiveGameSessionsAsync(int userId)
         {
             var sessions = await SessionWithFullIncludes()
@@ -77,7 +77,9 @@ namespace RPG_dotnet.Services.GameSessionService
                              gs.participants.Any(p => p.userId == userId))
                 .ToListAsync();
 
-            return ServiceResponse<List<GetGameSessionDto>>.Success(sessions.Select(gs => _mapper.Map<GetGameSessionDto>(gs)).ToList(), "Retrieved active sessions successfully");
+            return ServiceResponse<List<GetGameSessionDto>>.Success(
+                sessions.Select(gs => _mapper.Map<GetGameSessionDto>(gs)).ToList(),
+                "Retrieved active sessions successfully");
         }
 
         public async Task<ServiceResponse<GetGameSessionDto>> GetGameSessionByIdAsync(int sessionId)
@@ -86,7 +88,8 @@ namespace RPG_dotnet.Services.GameSessionService
                               .FirstOrDefaultAsync(gs => gs.gameSessionId == sessionId)
                           ?? throw new NotFoundException("Session not found.");
 
-            return ServiceResponse<GetGameSessionDto>.Success(_mapper.Map<GetGameSessionDto>(session), "Retrieved session successfully");
+            return ServiceResponse<GetGameSessionDto>.Success(
+                _mapper.Map<GetGameSessionDto>(session), "Retrieved session successfully");
         }
 
         public async Task<ServiceResponse<GetGameSessionDto>> MoveCharacterAsync(int userId, MoveActionDto dto)
@@ -110,6 +113,9 @@ namespace RPG_dotnet.Services.GameSessionService
             if (character.hasActedThisTurn)
                 throw new GenericException("This character has already acted this turn.", 400);
 
+            if (character.isStunned)
+                throw new GenericException("This character is stunned and cannot act.", 400);
+
             float newPos = character.team == TeamSide.CREATOR
                 ? Math.Min(character.xPosition + character.character.movement, session.maxPosition)
                 : Math.Max(character.xPosition - character.character.movement, session.minPosition);
@@ -118,18 +124,20 @@ namespace RPG_dotnet.Services.GameSessionService
             character.hasActedThisTurn = true;
 
             LogAction(session, GameActionType.Move, character.characterId, newPosition: newPos);
-
             TryAdvanceTurn(session, userId);
 
             await _context.SaveChangesAsync();
 
-            return ServiceResponse<GetGameSessionDto>.Success(_mapper.Map<GetGameSessionDto>(session), "Character moved successfully");
+            return ServiceResponse<GetGameSessionDto>.Success(
+                _mapper.Map<GetGameSessionDto>(session), "Character moved successfully");
         }
 
-        public async Task<ServiceResponse<GetGameSessionDto>> AttackCharacterAsync(int userId, AttackCharacterDto dto)
+        public async Task<ServiceResponse<GetGameSessionDto>> AttackCharacterAsync(
+            int userId, AttackCharacterDto dto)
         {
             var session = await SessionWithFullIncludes()
-                .FirstOrDefaultAsync(gs => gs.gameSessionId == dto.sessionId && gs.state == GameSessionState.ACTIVE)
+                .FirstOrDefaultAsync(gs => gs.gameSessionId == dto.sessionId
+                                        && gs.state == GameSessionState.ACTIVE)
                 ?? throw new NotFoundException("Active session not found.");
 
             Functions.EnsureUserTurn(session, userId);
@@ -145,11 +153,8 @@ namespace RPG_dotnet.Services.GameSessionService
             if (!attacker.isAlive || !target.isAlive)
                 throw new GenericException("One or both characters are not alive.", 400);
 
-            if (attacker.role != RoleType.Vanguard)
-                throw new GenericException("Only Vanguard characters can perform a basic attack.", 403);
-
-            if (!Functions.IsWithinProximity(attacker.xPosition, target.xPosition))
-                throw new GenericException("Vanguard can only attack targets in close proximity.", 400);
+            if (attacker.isStunned)
+                throw new GenericException("This character is stunned and cannot act.", 400);
 
             if (attacker.hasActedThisTurn)
                 throw new GenericException("This character has already acted this turn.", 400);
@@ -157,9 +162,11 @@ namespace RPG_dotnet.Services.GameSessionService
             if (target.userId == userId)
                 throw new GenericException("Cannot attack your own character.", 400);
 
-            int damage = attacker.character.baseDamage;
-            target.currentHealth = Math.Max(0, target.currentHealth - damage);
-            if (target.currentHealth <= 0) target.isAlive = false;
+            if (attacker.role == RoleType.Vanguard &&
+                !Functions.IsWithinProximity(attacker.xPosition, target.xPosition))
+                throw new GenericException("Vanguard characters can only attack targets in close proximity.", 400);
+
+            int damageDealt = ApplyDamage(target, attacker.character.baseDamage);
 
             double manaGained = 0;
             if (attacker.currentMana < attacker.maxMana)
@@ -176,7 +183,7 @@ namespace RPG_dotnet.Services.GameSessionService
             LogAction(session, GameActionType.Attack,
                 actorCharacterId: attacker.characterId,
                 targetCharacterId: target.characterId,
-                damageDealt: damage,
+                damageDealt: damageDealt,
                 manaGained: manaGained);
 
             Functions.CheckVictoryCondition(session);
@@ -186,7 +193,8 @@ namespace RPG_dotnet.Services.GameSessionService
 
             await _context.SaveChangesAsync();
 
-            return ServiceResponse<GetGameSessionDto>.Success(_mapper.Map<GetGameSessionDto>(session), "Character attacked successfully");
+            return ServiceResponse<GetGameSessionDto>.Success(
+                _mapper.Map<GetGameSessionDto>(session), "Attack successful");
         }
 
         public async Task<ServiceResponse<GetGameSessionDto>> AbandonSessionAsync(int userId, int sessionId)
@@ -217,14 +225,7 @@ namespace RPG_dotnet.Services.GameSessionService
             if (dto.characterIds == null || dto.characterIds.Count != 2)
                 throw new GenericException("Exactly two character IDs must be provided.", 422);
 
-            var characters = await _context.Characters
-                .Where(c => dto.characterIds.Contains(c.id))
-                .ToListAsync();
-
-            if (characters.Count != 2)
-                throw new GenericException("One or more character IDs are invalid.", 422);
-
-            ValidateTeamComposition(characters);
+            var characters = await LoadAndValidateCharactersAsync(dto.characterIds);
 
             foreach (var character in characters)
             {
@@ -241,7 +242,8 @@ namespace RPG_dotnet.Services.GameSessionService
                     isAlive = true,
                     role = character.role,
                     hasActedThisTurn = false,
-                    team = TeamSide.OPPONENT
+                    team = TeamSide.OPPONENT,
+                    reviveCount = character.fighterClass == RpgClass.Berserker ? 1 : 0
                 });
             }
 
@@ -272,10 +274,12 @@ namespace RPG_dotnet.Services.GameSessionService
             return ServiceResponse<GetGameSessionDto>.Success(_mapper.Map<GetGameSessionDto>(session), "Session rejected successfully");
         }
 
-        public async Task<ServiceResponse<GetGameSessionDto>> CastSpellAsync(int userId, CastSpellDto dto)
+        public async Task<ServiceResponse<GetGameSessionDto>> CastSpellAsync(
+            int userId, CastSpellDto dto)
         {
             var session = await SessionWithFullIncludes()
-                .FirstOrDefaultAsync(gs => gs.gameSessionId == dto.sessionId && gs.state == GameSessionState.ACTIVE)
+                .FirstOrDefaultAsync(gs => gs.gameSessionId == dto.sessionId
+                                        && gs.state == GameSessionState.ACTIVE)
                 ?? throw new NotFoundException("Game session not found.");
 
             Functions.EnsureUserTurn(session, userId);
@@ -284,22 +288,14 @@ namespace RPG_dotnet.Services.GameSessionService
                 .FirstOrDefault(p => p.characterId == dto.casterId && p.userId == userId)
                 ?? throw new GenericException("Caster not found or not owned by this user.", 422);
 
-            var target = session.participants
-                .FirstOrDefault(p => p.characterId == dto.targetId)
-                ?? throw new GenericException("Target not found.", 422);
-
             if (!caster.isAlive)
                 throw new GenericException("Caster is not alive.", 422);
-
-            if (!target.isAlive)
-                throw new GenericException("Target is not alive.", 422);
 
             if (caster.hasActedThisTurn)
                 throw new GenericException("This character has already acted this turn.", 400);
 
-            if (caster.role == RoleType.Vanguard &&
-                !Functions.IsWithinProximity(caster.xPosition, target.xPosition))
-                throw new GenericException("Vanguard characters can only cast spells on nearby targets.", 422);
+            if (caster.isStunned)
+                throw new GenericException("This character is stunned and cannot act.", 400);
 
             var ability = caster.character.abilities
                 .FirstOrDefault(a => a.id == dto.abilityId)
@@ -308,19 +304,118 @@ namespace RPG_dotnet.Services.GameSessionService
             if (caster.currentMana < ability.manaCost)
                 throw new GenericException("Not enough mana to cast this spell.", 422);
 
-            caster.currentMana -= ability.manaCost;
-            int damage = ability.damage;
-            target.currentHealth = Math.Max(0, target.currentHealth - damage);
-            if (target.currentHealth <= 0) target.isAlive = false;
+            // Validate target ownership matches ability target type
+            SessionCharacterState target = null;
 
+            if (ability.targetType == AbilityTargetType.Ally)
+            {
+                // Heal — must target own team
+                target = session.participants
+                    .FirstOrDefault(p => p.characterId == dto.targetId && p.userId == userId)
+                    ?? throw new GenericException("Heal target must be one of your own characters.", 422);
+            }
+            else if (ability.targetType == AbilityTargetType.Enemy
+                     || ability.targetType == AbilityTargetType.AllEnemies)
+            {
+                // Enemy or MultiTarget — dto.targetId is validated for single
+                // target; MultiTarget fetches all enemies in the switch below
+                target = session.participants
+                    .FirstOrDefault(p => p.characterId == dto.targetId && p.userId != userId)
+                    ?? throw new GenericException("Target not found or is not an enemy.", 422);
+
+                if (!target.isAlive)
+                    throw new GenericException("Target is not alive.", 422);
+
+                // Proximity check: Vanguard casters must be in range UNLESS
+                // the ability is MultiTarget — NP range is not restricted
+                if (caster.role == RoleType.Vanguard
+                    && ability.effect != AbilityEffect.MultiTarget
+                    && !Functions.IsWithinProximity(caster.xPosition, target.xPosition))
+                    throw new GenericException(
+                        "Vanguard characters can only cast spells on nearby targets.", 422);
+            }
+
+            caster.currentMana -= ability.manaCost;
             caster.hasActedThisTurn = true;
+
+            int damageDealt = 0;
+            float? pushedToPosition = null;
+
+            switch (ability.effect)
+            {
+                case AbilityEffect.None:
+                    damageDealt = ApplyDamage(target, ability.damage);
+                    break;
+
+                case AbilityEffect.DefensePierce:
+                    // Gáe Bolg, Tsubame Gaeshi — bypass defense entirely
+                    damageDealt = ApplyDamage(target, ability.damage, pierceDefense: true);
+                    break;
+
+                case AbilityEffect.Heal:
+                    // Garden of Avalon — restore HP to ally, capped at maxHealth
+                    int healAmount = Math.Min(ability.effectValue, target.maxHealth - target.currentHealth);
+                    target.currentHealth += healAmount;
+                    // Log heal amount as negative damage for clarity on frontend
+                    damageDealt = -healAmount;
+                    break;
+
+                case AbilityEffect.ManaDrain:
+                    // Gáe Dearg, Rule Breaker — damage then strip mana
+                    damageDealt = ApplyDamage(target, ability.damage);
+                    if (target.isAlive)
+                        target.currentMana = Math.Max(0, target.currentMana - ability.effectValue);
+                    break;
+
+                case AbilityEffect.Stun:
+                    // Zabaniya — damage then flag target to skip next action
+                    damageDealt = ApplyDamage(target, ability.damage);
+                    if (target.isAlive)
+                        target.isStunned = true;
+                    break;
+
+                case AbilityEffect.Poison:
+                    // All the World's Evil — partial damage now, DoT for 2 turns
+                    damageDealt = ApplyDamage(target, ability.damage);
+                    if (target.isAlive)
+                    {
+                        target.poisonStacks = 2;
+                        target.poisonDamagePerTick = ability.effectValue;
+                    }
+                    break;
+
+                case AbilityEffect.MultiTarget:
+                    // Unlimited Blade Works, Phoebus Catastrophe, Ionioi Hetairoi
+                    // Hit all living enemies regardless of position
+                    var enemies = session.participants
+                        .Where(p => p.userId != userId && p.isAlive)
+                        .ToList();
+                    foreach (var enemy in enemies)
+                        damageDealt += ApplyDamage(enemy, ability.damage);
+                    break;
+
+                case AbilityEffect.PositionPush:
+                    // Bellerophon — damage then push target away
+                    damageDealt = ApplyDamage(target, ability.damage);
+                    if (target.isAlive)
+                    {
+                        target.xPosition = target.team == TeamSide.CREATOR
+                            ? Math.Max(target.xPosition - ability.effectValue, session.minPosition)
+                            : Math.Min(target.xPosition + ability.effectValue, session.maxPosition);
+                        pushedToPosition = target.xPosition;
+                    }
+                    break;
+            }
 
             LogAction(session, GameActionType.CastSpell,
                 actorCharacterId: caster.characterId,
-                targetCharacterId: target.characterId,
+                targetCharacterId: ability.effect == AbilityEffect.MultiTarget
+                    ? null
+                    : target?.characterId,
                 abilityId: ability.id,
-                damageDealt: damage,
-                manaSpent: ability.manaCost);
+                damageDealt: damageDealt,
+                manaSpent: ability.manaCost,
+                newPosition: pushedToPosition);
 
             Functions.CheckVictoryCondition(session);
 
@@ -329,9 +424,12 @@ namespace RPG_dotnet.Services.GameSessionService
 
             await _context.SaveChangesAsync();
 
-            return ServiceResponse<GetGameSessionDto>.Success(_mapper.Map<GetGameSessionDto>(session), "Spell cast successfully");
+            return ServiceResponse<GetGameSessionDto>.Success(
+                _mapper.Map<GetGameSessionDto>(session), "Spell cast successfully");
         }
-        public async Task<ServiceResponse<List<GetGameSessionDto>>> GetGameSessionsByUserIdAsync(int userId, GameSessionState? state = null)
+
+        public async Task<ServiceResponse<List<GetGameSessionDto>>> GetGameSessionsByUserIdAsync(
+            int userId, GameSessionState? state = null)
         {
             var query = SessionWithFullIncludes()
                 .Where(gs => gs.creatorUserId == userId || gs.opponentUserId == userId);
@@ -344,14 +442,16 @@ namespace RPG_dotnet.Services.GameSessionService
             if (!sessions.Any())
                 throw new NotFoundException("No game sessions found for the specified user.");
 
-            return ServiceResponse<List<GetGameSessionDto>>.Success(sessions.Select(gs => _mapper.Map<GetGameSessionDto>(gs)).ToList(), "Retrieved game sessions successfully");
+            return ServiceResponse<List<GetGameSessionDto>>.Success(
+                sessions.Select(gs => _mapper.Map<GetGameSessionDto>(gs)).ToList(),
+                "Retrieved game sessions successfully");
         }
 
-        public async Task<ServiceResponse<GetGameSessionDto>> EndTurnAsync(
-            int userId, EndTurnDto dto)
+        public async Task<ServiceResponse<GetGameSessionDto>> EndTurnAsync(int userId, EndTurnDto dto)
         {
             var session = await SessionWithFullIncludes()
-                              .FirstOrDefaultAsync(gs => gs.gameSessionId == dto.sessionId && gs.state == GameSessionState.ACTIVE)
+                              .FirstOrDefaultAsync(gs => gs.gameSessionId == dto.sessionId
+                                                         && gs.state == GameSessionState.ACTIVE)
                           ?? throw new NotFoundException("Active session not found.");
 
             Functions.EnsureUserTurn(session, userId);
@@ -363,10 +463,13 @@ namespace RPG_dotnet.Services.GameSessionService
                 actorCharacterId: session.participants.First(p => p.userId == userId).characterId);
 
             Functions.AdvanceTurn(session);
+            ProcessTurnStartEffects(session);
+            Functions.CheckVictoryCondition(session);
 
             await _context.SaveChangesAsync();
 
-            return ServiceResponse<GetGameSessionDto>.Success(_mapper.Map<GetGameSessionDto>(session), "Turn ended successfully");
+            return ServiceResponse<GetGameSessionDto>.Success(
+                _mapper.Map<GetGameSessionDto>(session), "Turn ended successfully");
         }
 
         private IQueryable<GameSession> SessionWithFullIncludes() =>
@@ -407,6 +510,76 @@ namespace RPG_dotnet.Services.GameSessionService
             });
         }
 
+        private static int ApplyDamage(
+            SessionCharacterState target,
+            int rawDamage,
+            bool pierceDefense = false)
+        {
+            int effectiveDamage = pierceDefense
+                ? rawDamage
+                : Math.Max(1, rawDamage - target.character.defense / 2);
+
+            target.currentHealth = Math.Max(0, target.currentHealth - effectiveDamage);
+
+            if (target.currentHealth <= 0)
+            {
+                // Heracles passive: reviveCount > 0 means God Hand intercepts death
+                if (target.reviveCount > 0)
+                {
+                    target.currentHealth = 30;
+                    target.reviveCount--;
+                }
+                else
+                {
+                    target.isAlive = false;
+                }
+            }
+
+            return effectiveDamage;
+        }
+
+        private static void ProcessTurnStartEffects(GameSession session)
+        {
+            var incoming = session.participants
+                .Where(p => p.userId == session.currentTurnPlayerId && p.isAlive)
+                .ToList();
+
+            foreach (var p in incoming)
+            {
+                if (p.isStunned)
+                {
+                    p.hasActedThisTurn = true; // forces the character to skip
+                    p.isStunned = false;
+                }
+
+                if (p.poisonStacks > 0)
+                {
+                    p.currentHealth = Math.Max(0, p.currentHealth - p.poisonDamagePerTick);
+                    p.poisonStacks--;
+
+                    if (p.currentHealth <= 0)
+                    {
+                        if (p.reviveCount > 0)
+                        {
+                            p.currentHealth = 30;
+                            p.reviveCount--;
+                        }
+                        else
+                        {
+                            p.isAlive = false;
+                        }
+                    }
+
+                    if (p.poisonStacks == 0)
+                        p.poisonDamagePerTick = 0;
+                }
+            }
+        }
+
+        // Only advances the turn once all of the current player's alive
+        // characters have acted. After switching, immediately processes
+        // status effects on the incoming player and checks for victory
+        // in case poison killed someone on the turn boundary.
         private static void TryAdvanceTurn(GameSession session, int userId)
         {
             bool allActed = session.participants
@@ -414,7 +587,11 @@ namespace RPG_dotnet.Services.GameSessionService
                 .All(p => p.hasActedThisTurn);
 
             if (allActed)
+            {
                 Functions.AdvanceTurn(session);
+                ProcessTurnStartEffects(session);
+                Functions.CheckVictoryCondition(session);
+            }
         }
 
         private static void ValidateTeamComposition(List<Characters> characters)
@@ -425,6 +602,28 @@ namespace RPG_dotnet.Services.GameSessionService
             if (!hasSupport || !hasVanguard)
                 throw new GenericException(
                     "A valid team must consist of one Support and one Vanguard character.", 422);
+        }
+
+        // Shared character validation used by both Create and Accept.
+        // Checks IDs exist AND that all selected characters are available
+        // for play — isPlayable = false means the character is in the DB
+        // but locked (balancing, unreleased, etc).
+        private async Task<List<Characters>> LoadAndValidateCharactersAsync(List<int> characterIds)
+        {
+            var characters = await _context.Characters
+                .Where(c => characterIds.Contains(c.id))
+                .ToListAsync();
+
+            if (characters.Count != characterIds.Count)
+                throw new GenericException("One or more character IDs are invalid.", 422);
+
+            if (characters.Any(c => !c.isPlayable))
+                throw new GenericException(
+                    "One or more selected characters are not currently available for play.", 422);
+
+            ValidateTeamComposition(characters);
+
+            return characters;
         }
 
     }

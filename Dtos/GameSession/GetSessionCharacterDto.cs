@@ -21,5 +21,9 @@ namespace RPG_dotnet.Dtos.GameSession
         public bool hasActedThisTurn { get; set; }
         public float xPosition { get; set; }
         public TeamSide team { get; set; }
+        public bool isStunned { get; set; }
+        public int poisonStacks { get; set; }
+        public int poisonDamagePerTick { get; set; }
+        public int reviveCount { get; set; }
     }
 }
