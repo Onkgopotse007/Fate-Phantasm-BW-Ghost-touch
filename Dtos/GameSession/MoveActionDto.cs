@@ -9,6 +9,6 @@ namespace RPG_dotnet.Dtos.GameSession
     {
         public int sessionId { get; set; }
         public int characterId { get; set; }
-        public float newPosition { get; set; }
+        public MoveDirection direction { get; set; } = MoveDirection.Forward;
     }
 }

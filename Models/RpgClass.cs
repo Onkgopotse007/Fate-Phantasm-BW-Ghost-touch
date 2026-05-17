@@ -62,4 +62,11 @@ namespace RPG_dotnet.Models
         Ally,
         AllEnemies
     }
+
+    [System.Text.Json.Serialization.JsonConverter(typeof(JsonStringEnumConverter))]
+    public enum MoveDirection
+    {
+        Forward,
+        Backward
+    }
 }

@@ -116,9 +116,20 @@ namespace RPG_dotnet.Services.GameSessionService
             if (character.isStunned)
                 throw new GenericException("This character is stunned and cannot act.", 400);
 
-            float newPos = character.team == TeamSide.CREATOR
-                ? Math.Min(character.xPosition + character.character.movement, session.maxPosition)
-                : Math.Max(character.xPosition - character.character.movement, session.minPosition);
+            float newPos;
+
+            if (dto.direction == MoveDirection.Forward)
+            {
+                newPos = character.team == TeamSide.CREATOR
+                    ? Math.Min(character.xPosition + character.character.movement, session.maxPosition)
+                    : Math.Max(character.xPosition - character.character.movement, session.minPosition);
+            }
+            else
+            {
+                newPos = character.team == TeamSide.CREATOR
+                    ? Math.Max(character.xPosition - character.character.movement, session.minPosition)
+                    : Math.Min(character.xPosition + character.character.movement, session.maxPosition);
+            }
 
             character.xPosition = newPos;
             character.hasActedThisTurn = true;
