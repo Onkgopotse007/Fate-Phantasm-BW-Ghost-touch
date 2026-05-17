@@ -11,5 +11,8 @@ namespace RPG_dotnet.Dtos.Characters
         public string description { get; set; } = string.Empty;
         public int manaCost { get; set; }
         public int damage { get; set; }
+        public AbilityEffect effect { get; set; } = AbilityEffect.None;
+        public int effectValue { get; set; } = 0;
+        public AbilityTargetType targetType { get; set; } = AbilityTargetType.Enemy;
     }
 }

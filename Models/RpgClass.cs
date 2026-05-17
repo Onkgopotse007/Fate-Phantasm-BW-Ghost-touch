@@ -39,4 +39,27 @@ namespace RPG_dotnet.Models
         CREATOR,
         OPPONENT
     }
+
+    // New: drives the special effect a Noble Phantasm applies on cast
+    [System.Text.Json.Serialization.JsonConverter(typeof(JsonStringEnumConverter))]
+    public enum AbilityEffect
+    {
+        None,
+        Heal,
+        ManaDrain,
+        Stun,
+        Poison,
+        MultiTarget,
+        DefensePierce,
+        PositionPush,
+        Revive
+    }
+
+    [System.Text.Json.Serialization.JsonConverter(typeof(JsonStringEnumConverter))]
+    public enum AbilityTargetType
+    {
+        Enemy,
+        Ally,
+        AllEnemies
+    }
 }

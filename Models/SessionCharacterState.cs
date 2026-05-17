@@ -31,5 +31,9 @@ namespace RPG_dotnet.Models
         public RoleType role { get; set; }
         public bool hasActedThisTurn { get; set; } = false;
         public TeamSide team { get; set; }
+        public bool isStunned { get; set; } = false;
+        public int poisonStacks { get; set; } = 0;
+        public int poisonDamagePerTick { get; set; } = 0;
+        public int reviveCount { get; set; } = 0;
     }
 }
