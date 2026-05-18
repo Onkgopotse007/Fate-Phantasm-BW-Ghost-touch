@@ -20,7 +20,6 @@ namespace RPG_dotnet.Data
         public DbSet<Characters> Characters => Set<Characters>();
         public DbSet<User> Users => Set<User>();
         public DbSet<Ability> Abilities => Set<Ability>();
-        public DbSet<Loadout> Loadouts { get; set; }
 
         public DbSet<GameSession> GameSessions { get; set; }
         public DbSet<SessionCharacterState> SessionCharacterStates { get; set; }
@@ -38,45 +37,6 @@ namespace RPG_dotnet.Data
             modelBuilder.Entity<User>()
                 .HasIndex(u => u.userName)
                 .IsUnique();
-
-            if (_seedAbilities)
-            {
-                modelBuilder.Entity<Ability>().HasData(
-                    new Ability
-                    {
-                        id = 1,
-                        name = "Excalibur",
-                        description = "Unleashes a powerful beam of light.",
-                        manaCost = 30,
-                        damage = 40,
-                        characterId = 0
-                    },
-                    new Ability
-                    {
-                        id = 2,
-                        name = "Unlimited blade works",
-                        description = "Unleashes an arsenal of copied sacred treasures toward the target. - \"I am the bone of my sword \"",
-                        manaCost = 60,
-                        damage = 70,
-                        characterId = 0
-                    }
-                );
-            }
-
-            //loadout
-            modelBuilder.Entity<LoadoutCharacter>()
-                .HasKey(lc => new { lc.loadoutId, lc.characterId });
-
-            modelBuilder.Entity<LoadoutCharacter>()
-                .HasOne(lc => lc.loadout)
-                .WithMany(l => l.characters)
-                .HasForeignKey(lc => lc.loadoutId);
-
-            modelBuilder.Entity<LoadoutCharacter>()
-                .HasOne(lc => lc.character)
-                .WithMany()
-                .HasForeignKey(lc => lc.characterId);
-
             modelBuilder.Entity<GameSession>()
                 .HasMany(gs => gs.participants)
                 .WithOne(scs => scs.session)
