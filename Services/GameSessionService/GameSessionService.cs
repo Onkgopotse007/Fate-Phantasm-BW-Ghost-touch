@@ -5,6 +5,8 @@ using RPG_dotnet.Models;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.SignalR;
+using RPG_dotnet.Hubs;
 
 namespace RPG_dotnet.Services.GameSessionService
 {
@@ -12,11 +14,13 @@ namespace RPG_dotnet.Services.GameSessionService
     {
         private readonly IMapper _mapper;
         private readonly DataContext _context;
+        private readonly IHubContext<GameSessionHub, IGameSessionClient> _hub;
 
-        public GameSessionService(DataContext context, IMapper mapper)
+        public GameSessionService(DataContext context, IMapper mapper, IHubContext<GameSessionHub, IGameSessionClient> hub)
         {
             _context = context;
             _mapper = mapper;
+            _hub = hub;
         }
 
         public async Task<ServiceResponse<GetGameSessionDto>> CreateGameSessionAsync(
@@ -65,6 +69,8 @@ namespace RPG_dotnet.Services.GameSessionService
 
             var created = await SessionWithFullIncludes()
                 .FirstAsync(gs => gs.gameSessionId == session.gameSessionId);
+
+            await PushSessionUpdate(created);
 
             return ServiceResponse<GetGameSessionDto>.Success(
                 _mapper.Map<GetGameSessionDto>(created), "Created new session successfully");
@@ -138,6 +144,7 @@ namespace RPG_dotnet.Services.GameSessionService
             TryAdvanceTurn(session, userId);
 
             await _context.SaveChangesAsync();
+            await PushSessionUpdate(session);
 
             return ServiceResponse<GetGameSessionDto>.Success(
                 _mapper.Map<GetGameSessionDto>(session), "Character moved successfully");
@@ -203,6 +210,7 @@ namespace RPG_dotnet.Services.GameSessionService
                 TryAdvanceTurn(session, userId);
 
             await _context.SaveChangesAsync();
+            await PushSessionUpdate(session);
 
             return ServiceResponse<GetGameSessionDto>.Success(
                 _mapper.Map<GetGameSessionDto>(session), "Attack successful");
@@ -220,6 +228,7 @@ namespace RPG_dotnet.Services.GameSessionService
 
             session.state = GameSessionState.ABANDONED;
             await _context.SaveChangesAsync();
+            await PushSessionUpdate(session);
 
             return ServiceResponse<GetGameSessionDto>.Success(_mapper.Map<GetGameSessionDto>(session), "Session abandoned successfully");
         }
@@ -266,6 +275,7 @@ namespace RPG_dotnet.Services.GameSessionService
             session.state = GameSessionState.ACTIVE;
 
             await _context.SaveChangesAsync();
+            await PushSessionUpdate(session);
 
             return ServiceResponse<GetGameSessionDto>.Success(_mapper.Map<GetGameSessionDto>(session), "Session accepted successfully");
         }
@@ -281,6 +291,7 @@ namespace RPG_dotnet.Services.GameSessionService
 
             session.state = GameSessionState.REJECTED;
             await _context.SaveChangesAsync();
+            await PushSessionUpdate(session);
 
             return ServiceResponse<GetGameSessionDto>.Success(_mapper.Map<GetGameSessionDto>(session), "Session rejected successfully");
         }
@@ -434,6 +445,7 @@ namespace RPG_dotnet.Services.GameSessionService
                 TryAdvanceTurn(session, userId);
 
             await _context.SaveChangesAsync();
+            await PushSessionUpdate(session);
 
             return ServiceResponse<GetGameSessionDto>.Success(
                 _mapper.Map<GetGameSessionDto>(session), "Spell cast successfully");
@@ -478,6 +490,7 @@ namespace RPG_dotnet.Services.GameSessionService
             Functions.CheckVictoryCondition(session);
 
             await _context.SaveChangesAsync();
+            await PushSessionUpdate(session);
 
             return ServiceResponse<GetGameSessionDto>.Success(
                 _mapper.Map<GetGameSessionDto>(session), "Turn ended successfully");
@@ -635,6 +648,17 @@ namespace RPG_dotnet.Services.GameSessionService
             ValidateTeamComposition(characters);
 
             return characters;
+        }
+
+        private async Task PushSessionUpdate(GameSession session)
+        {
+            var dto = _mapper.Map<GetGameSessionDto>(session);
+            var group = GameSessionHub.GroupName(session.gameSessionId);
+
+            if (session.state == GameSessionState.COMPLETED)
+                await _hub.Clients.Group(group).SessionCompleted(dto);
+            else
+                await _hub.Clients.Group(group).SessionUpdated(dto);
         }
 
     }
