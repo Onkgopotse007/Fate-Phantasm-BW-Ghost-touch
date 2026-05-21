@@ -39,6 +39,7 @@ using Serilog.Debugging;
 using Serilog.Events;
 using Serilog.Sinks.Elasticsearch;
 using Serilog.Sinks.File;
+using RPG_dotnet.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 DotEnv.Load();
@@ -75,6 +76,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IGameSessionService, GameSessionService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<AllowUnauthenticatedAttribute>();
+builder.Services.AddSignalR();
 builder.Services.AddValidatorsFromAssemblyContaining<CreateCharacterReqValidator>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -92,7 +94,21 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             OnChallenge = async context =>
             {
                 await Task.Run(() => throw new AuthException());
+            },
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+
+                if (!string.IsNullOrEmpty(accessToken) &&
+                    path.StartsWithSegments("/hubs/gamesession"))
+                {
+                    context.Token = accessToken;
+                }
+
+                return Task.CompletedTask;
             }
+
         };
     });
 Log.Logger = new LoggerConfiguration()
@@ -153,5 +169,6 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<GameSessionHub>("/hubs/gamesession");
 
 app.Run();
