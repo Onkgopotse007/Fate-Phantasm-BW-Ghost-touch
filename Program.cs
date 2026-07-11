@@ -48,8 +48,11 @@ string token = Environment.GetEnvironmentVariable("TOKEN");
 string esUri = Environment.GetEnvironmentVariable("ELASTIC_URI");
 string esUsername = Environment.GetEnvironmentVariable("ELASTIC_USERNAME");
 string esPassword = Environment.GetEnvironmentVariable("ELASTIC_PASSWORD");
-if (connString is null || token is null || esUri is null || esUsername is null || esPassword is null)
+string corsOrigins = Environment.GetEnvironmentVariable("CORS_ALLOWED_ORIGINS");
+if (connString is null || token is null)
     throw new NotFoundException("Missing environment variables");
+// Elasticsearch is optional so local dev can run without a cluster
+bool elasticConfigured = esUri is not null && esUsername is not null && esPassword is not null;
 // Add services to the container.
 builder.Services.AddDbContext<DataContext>(options =>
 options.UseSqlServer(connString));
@@ -111,7 +114,28 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
         };
     });
-Log.Logger = new LoggerConfiguration()
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        if (!string.IsNullOrWhiteSpace(corsOrigins))
+        {
+            policy.WithOrigins(corsOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials();
+        }
+        else
+        {
+            // No origins configured: allow everything (credentials included, needed by SignalR)
+            policy.SetIsOriginAllowed(_ => true)
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials();
+        }
+    });
+});
+var loggerConfiguration = new LoggerConfiguration()
     .Enrich.FromLogContext()
     .MinimumLevel.Information()
     // --- Start Overrides to reduce clutter from Microsoft and EF Core ---
@@ -135,8 +159,11 @@ Log.Logger = new LoggerConfiguration()
     // .MinimumLevel.Override("Microsoft.AspNetCore.Routing.EndpointMiddleware", LogEventLevel.Warning) // For "Executing endpoint"
 
 
-    .WriteTo.Console(new ElasticsearchJsonFormatter())
-    .WriteTo.Elasticsearch(new ElasticsearchSinkOptions(new Uri(esUri))
+    .WriteTo.Console(new ElasticsearchJsonFormatter());
+
+if (elasticConfigured)
+{
+    loggerConfiguration.WriteTo.Elasticsearch(new ElasticsearchSinkOptions(new Uri(esUri))
     {
         AutoRegisterTemplate = false,
         IndexFormat = "dotnet-app-logs-{0:yyyy.MM}",
@@ -147,8 +174,13 @@ Log.Logger = new LoggerConfiguration()
         EmitEventFailure = EmitEventFailureHandling.WriteToSelfLog |
                            EmitEventFailureHandling.WriteToFailureSink |
                            EmitEventFailureHandling.ThrowException
-    })
-    .CreateLogger();
+    });
+}
+
+Log.Logger = loggerConfiguration.CreateLogger();
+
+if (!elasticConfigured)
+    Log.Warning("Elasticsearch environment variables not set, logging to console only");
 
 builder.Services.AddSingleton(Log.Logger);
 
@@ -163,6 +195,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseCors();
 app.UseCorrelationId();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 //not needed for now app.UseHttpsRedirection();
