@@ -23,12 +23,14 @@ jobs:
         uses: actions/setup-dotnet@v3
         with:
           dotnet-version: ${{matrix.dotnet-version}}
+      # Target the solution explicitly: the repo root contains both a
+      # solution and a project file, so bare dotnet commands are ambiguous
       - name: Restore dependencies
-        run: dotnet restore
+        run: dotnet restore Fate-Phantasm-BW-Ghost-touch.sln
       - name: Build
-        run: dotnet build --no-restore
+        run: dotnet build Fate-Phantasm-BW-Ghost-touch.sln --no-restore
       - name: Test
-        run: dotnet test --verbosity normal
+        run: dotnet test Fate-Phantasm-BW-Ghost-touch.sln --verbosity normal
      # - name: Configure AWS CLI
       #  run: |
        #   aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
