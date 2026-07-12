@@ -485,9 +485,7 @@ namespace RPG_dotnet.Services.GameSessionService
             LogAction(session, GameActionType.EndTurn,
                 actorCharacterId: session.participants.First(p => p.userId == userId).characterId);
 
-            Functions.AdvanceTurn(session);
-            ProcessTurnStartEffects(session);
-            Functions.CheckVictoryCondition(session);
+            AdvanceTurnAndProcess(session);
 
             await _context.SaveChangesAsync();
             await PushSessionUpdate(session);
@@ -601,9 +599,9 @@ namespace RPG_dotnet.Services.GameSessionService
         }
 
         // Only advances the turn once all of the current player's alive
-        // characters have acted. After switching, immediately processes
-        // status effects on the incoming player and checks for victory
-        // in case poison killed someone on the turn boundary.
+        // characters have acted. The actual switch, status-effect
+        // processing and dead-turn skipping is delegated to
+        // AdvanceTurnAndProcess.
         private static void TryAdvanceTurn(GameSession session, int userId)
         {
             bool allActed = session.participants
@@ -611,7 +609,60 @@ namespace RPG_dotnet.Services.GameSessionService
                 .All(p => p.hasActedThisTurn);
 
             if (allActed)
+                AdvanceTurnAndProcess(session);
+        }
+
+        // Switches to the next player, applies their start-of-turn status
+        // effects (poison ticks, stun expiry) and checks for victory in case
+        // poison killed someone on the turn boundary.
+        //
+        // If the incoming player is left with no living character able to act
+        // — e.g. every survivor was stunned this turn — the server would
+        // otherwise hand them a dead turn it never ends, forcing a manual
+        // endturn call. Instead we log an automatic EndTurn for traceability
+        // and advance again.
+        //
+        // The skip loop is bounded two ways so that a state where BOTH players
+        // are fully incapacitated cannot spin forever: we stop as soon as
+        // control returns to the player we started from, and never iterate
+        // more than once per distinct player regardless.
+        private static void AdvanceTurnAndProcess(GameSession session)
+        {
+            int startingPlayerId = session.currentTurnPlayerId;
+            int playerCount = session.participants
+                .Select(p => p.userId)
+                .Distinct()
+                .Count();
+
+            Functions.AdvanceTurn(session);
+            ProcessTurnStartEffects(session);
+            Functions.CheckVictoryCondition(session);
+
+            for (int skips = 0;
+                 skips < playerCount && session.state == GameSessionState.ACTIVE;
+                 skips++)
             {
+                // A full lap back to whoever we started from without finding an
+                // able player: stop and let them resolve it manually rather
+                // than risk looping.
+                if (session.currentTurnPlayerId == startingPlayerId)
+                    break;
+
+                var incoming = session.participants
+                    .Where(p => p.userId == session.currentTurnPlayerId && p.isAlive)
+                    .ToList();
+
+                // At least one living character can still act — hand over a
+                // real turn.
+                if (incoming.Any(p => !p.hasActedThisTurn))
+                    break;
+
+                // No living character can act: auto-end this turn (when there is
+                // someone to attribute the log to) and advance to the next player.
+                if (incoming.Count > 0)
+                    LogAction(session, GameActionType.EndTurn,
+                        actorCharacterId: incoming.First().characterId);
+
                 Functions.AdvanceTurn(session);
                 ProcessTurnStartEffects(session);
                 Functions.CheckVictoryCondition(session);
